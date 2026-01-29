@@ -9155,7 +9155,13 @@ class OpinionSDKTrader:
             result = MergeSplitService.split(client, market_id, split_amount)
 
             if result['success']:
-                success(f"拆分成功!")
+                tx_hash = result.get('tx_hash', '')
+                if tx_hash:
+                    success(f"拆分成功! tx: {tx_hash[:20]}...")
+                else:
+                    success(f"拆分成功!")
+                if result.get('warning'):
+                    warning(f"警告: {result['warning'][:80]}")
                 success_count += 1
             else:
                 error(f"拆分失败: {result.get('error', '未知错误')}")

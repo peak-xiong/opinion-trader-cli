@@ -298,16 +298,22 @@ class MergeSplitService:
                 # SDK 可能返回 Tuple[tx_hash, safe_tx_hash, return_value] 或带 errno 的结果
                 result = client.split(market_id=market_id, amount=amount_int)
                 
+                # 调试日志
+                import logging
+                logging.info(f"Split result type: {type(result)}, value: {result}")
+                
                 # 处理 Tuple 返回值（新版 SDK）
                 if isinstance(result, tuple):
-                    if result and result[0]:  # tx_hash 存在表示成功
+                    tx_hash = result[0] if result else None
+                    # 检查 tx_hash 是否有效（非空字符串，且看起来像交易哈希）
+                    if tx_hash and isinstance(tx_hash, str) and len(tx_hash) > 10:
                         return {
                             'success': True, 
-                            'tx_hash': result[0], 
+                            'tx_hash': tx_hash, 
                             'shares': amount_int
                         }
                     else:
-                        return {'success': False, 'error': f'拆分失败: {result}'}
+                        return {'success': False, 'error': f'拆分失败: SDK返回 {result}'}
                 
                 # 处理带 errno 的结果（旧版 SDK）
                 if hasattr(result, 'errno') and result.errno == 0:
