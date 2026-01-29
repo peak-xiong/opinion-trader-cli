@@ -7,30 +7,15 @@ from typing import List, Optional
 
 
 class TraderConfig:
-    """交易配置
-
-    Attributes:
-        remark: 账户备注名
-        api_key: Opinion.trade API Key
-        eoa_address: EOA地址 - Opinion.trade上的注册地址，用于查询余额
-        private_key: 钱包私钥
-        proxy_address: 代理地址 - 用于交易，可自动从API获取
-    """
-    remark: str
+    """交易配置"""
+    remark: str  # 备注
     api_key: str
-    eoa_address: str
+    eoa_address: str  # EOA地址 - Opinion.trade上的注册地址，用于查询余额
     private_key: str
-    proxy_address: Optional[str] = None
+    proxy_address: str = None  # 代理地址 - 用于交易，可自动从API获取
 
-    def __init__(
-        self,
-        remark: str,
-        api_key: str,
-        eoa_address: str,
-        private_key: str,
-        proxy_address: Optional[str] = None,
-        socks5: Optional[str] = None
-    ):
+    def __init__(self, remark: str, api_key: str, eoa_address: str, private_key: str,
+                 proxy_address: str = None, socks5: str = None):
         self.remark = remark
         self.api_key = api_key
         self.eoa_address = eoa_address
@@ -38,17 +23,14 @@ class TraderConfig:
         self.proxy_address = proxy_address
         # socks5 参数保留但不使用，保持向后兼容
 
-    def get_proxies(self, proxy_type: str = 'socks5') -> Optional[dict]:
+    def get_proxies(self, proxy_type='socks5'):
         """获取当前账户的代理配置（已弃用，始终返回None）"""
         return None
 
 
 @dataclass
 class MarketMakerConfig:
-    """做市商策略配置
-
-    包含价格参数、仓位限制、止损设置、分层挂单、网格策略等配置项
-    """
+    """做市商策略配置"""
     # 基础参数
     market_id: int = 0
     token_id: str = ""
@@ -113,7 +95,7 @@ class MarketMakerConfig:
     layered_sell_enabled: bool = False  # 是否启用分层卖出
 
     # 价格层级列表，如 [1, 5, 10] 表示在卖1、卖5、卖10挂单
-    sell_price_levels: Optional[list] = None  # 默认 [1]，即只在卖1挂单
+    sell_price_levels: list = None  # 默认 [1]，即只在卖1挂单
 
     # 分布模式
     # 'uniform' = 垂直分布（每层相等）
@@ -123,20 +105,20 @@ class MarketMakerConfig:
     sell_distribution_mode: str = 'uniform'
 
     # 自定义比例（仅当 sell_distribution_mode='custom' 时使用）
-    sell_custom_ratios: Optional[list] = None
+    sell_custom_ratios: list = None
 
     # ============ 分层挂单配置（买入时使用）============
     # 启用分层买入挂单
     layered_buy_enabled: bool = False  # 是否启用分层买入
 
     # 价格层级列表，如 [1, 5, 10] 表示在买1、买5、买10挂单
-    buy_price_levels: Optional[list] = None  # 默认 [1]，即只在买1挂单
+    buy_price_levels: list = None  # 默认 [1]，即只在买1挂单
 
     # 分布模式
     buy_distribution_mode: str = 'uniform'
 
     # 自定义比例
-    buy_custom_ratios: Optional[list] = None
+    buy_custom_ratios: list = None
 
     # ============ 成本加成卖出配置 ============
     # 启用后：卖出价 = 平均买入成本 + 利润价差（而非跟随市场卖1价）
@@ -160,10 +142,7 @@ class MarketMakerConfig:
 
 @dataclass
 class MarketMakerState:
-    """做市商运行状态（每个账户独立）
-
-    包含参考价、挂单状态、交易统计、盈亏追踪、网格状态等
-    """
+    """做市商运行状态（每个账户独立）"""
     is_running: bool = False
 
     # 参考价（启动时记录，用于偏离度保护）
@@ -206,8 +185,7 @@ class MarketMakerState:
     total_fees: float = 0  # 累计手续费支出
 
     # 单笔交易记录（用于详细分析）
-    # 交易历史 [{'time', 'side', 'shares', 'price', 'amount'}, ...]
-    trade_history: Optional[list] = None
+    trade_history: Optional[list] = None  # 交易历史 [{'time', 'side', 'shares', 'price', 'amount'}, ...]
 
     # 价格统计
     min_buy_price: float = float('inf')  # 最低买入价

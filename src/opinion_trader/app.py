@@ -6,23 +6,16 @@ Opinion Trader CLI 应用主入口
 import sys
 import os
 
-# 确保项目根目录在 Python 路径中
-_project_root = os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))))
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
-
 
 def main():
     """应用主入口函数"""
-    # 导入原始的 trade.py 并运行
-    # 这是临时方案，保证功能正常运行
     try:
-        from trade import main as trade_main
+        from opinion_trader.core.trader import main as trade_main
         trade_main()
     except ImportError as e:
         print(f"✗ 无法启动应用: {e}")
-        print("  请确保在项目根目录运行")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
     except KeyboardInterrupt:
         print("\n\n已退出")

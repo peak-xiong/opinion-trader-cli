@@ -2,6 +2,7 @@
 订单簿管理模块
 实现「主动查询 + WS 推送兜底」模式
 """
+import asyncio
 import time
 import threading
 from typing import Dict, Callable, Optional, List, Tuple
@@ -11,10 +12,8 @@ from dataclasses import dataclass, field
 @dataclass
 class OrderbookState:
     """订单簿本地状态"""
-    bids: List[Tuple[float, float]] = field(
-        default_factory=list)  # [(price, size), ...] 按价格降序
-    asks: List[Tuple[float, float]] = field(
-        default_factory=list)  # [(price, size), ...] 按价格升序
+    bids: List[Tuple[float, float]] = field(default_factory=list)  # [(price, size), ...] 按价格降序
+    asks: List[Tuple[float, float]] = field(default_factory=list)  # [(price, size), ...] 按价格升序
     last_update_time: float = 0  # 最后更新时间戳
     last_ws_time: float = 0  # 最后 WS 消息时间
     source: str = ""  # 数据来源: 'rest' 或 'ws'
@@ -85,13 +84,9 @@ class OrderbookManager:
 
     DEFAULT_WS_TIMEOUT = 10  # 默认 WS 超时时间（秒）
 
-    def __init__(
-        self,
-        client,
-        token_id: str,
-        ws_timeout: float = DEFAULT_WS_TIMEOUT,
-        on_update: Optional[Callable[[OrderbookState], None]] = None
-    ):
+    def __init__(self, client, token_id: str,
+                 ws_timeout: float = DEFAULT_WS_TIMEOUT,
+                 on_update: Optional[Callable[[OrderbookState], None]] = None):
         """
         Args:
             client: Opinion SDK 客户端
@@ -129,10 +124,8 @@ class OrderbookManager:
             orderbook = response.result
 
             # 排序并转换
-            bids_sorted = sorted(orderbook.bids, key=lambda x: float(
-                x.price), reverse=True) if orderbook.bids else []
-            asks_sorted = sorted(orderbook.asks, key=lambda x: float(
-                x.price)) if orderbook.asks else []
+            bids_sorted = sorted(orderbook.bids, key=lambda x: float(x.price), reverse=True) if orderbook.bids else []
+            asks_sorted = sorted(orderbook.asks, key=lambda x: float(x.price)) if orderbook.asks else []
 
             bids = [(float(b.price), float(b.size)) for b in bids_sorted]
             asks = [(float(a.price), float(a.size)) for a in asks_sorted]
@@ -178,11 +171,9 @@ class OrderbookManager:
 
             with self._lock:
                 if side == 'bids':
-                    self._update_orderbook_side(
-                        self.state.bids, price, size, reverse=True)
+                    self._update_orderbook_side(self.state.bids, price, size, reverse=True)
                 elif side == 'asks':
-                    self._update_orderbook_side(
-                        self.state.asks, price, size, reverse=False)
+                    self._update_orderbook_side(self.state.asks, price, size, reverse=False)
 
                 self.state.last_update_time = time.time()
                 self.state.last_ws_time = time.time()
@@ -267,8 +258,7 @@ class OrderbookManager:
             print(f"  [OrderbookManager] 初始化失败：无法获取订单簿")
             return False
 
-        print(
-            f"  [OrderbookManager] 初始化成功，买1={self.state.bid1_price:.4f}，卖1={self.state.ask1_price:.4f}")
+        print(f"  [OrderbookManager] 初始化成功，买1={self.state.bid1_price:.4f}，卖1={self.state.ask1_price:.4f}")
 
         # 2. 启动超时监控
         self._running = True
@@ -313,11 +303,8 @@ class MultiTokenOrderbookManager:
         self._managers: Dict[str, OrderbookManager] = {}
         self._lock = threading.Lock()
 
-    def add_token(
-        self,
-        token_id: str,
-        on_update: Optional[Callable[[OrderbookState], None]] = None
-    ) -> OrderbookManager:
+    def add_token(self, token_id: str,
+                  on_update: Optional[Callable[[OrderbookState], None]] = None) -> OrderbookManager:
         """添加交易对
 
         Args:
@@ -376,6 +363,7 @@ class MultiTokenOrderbookManager:
             data: WS 消息数据
         """
         # 从消息中提取 token_id
+        # 注意：实际实现需要根据 WS 消息格式调整
         token_id = data.get('tokenId') or data.get('token_id')
         if token_id:
             manager = self.get_manager(str(token_id))

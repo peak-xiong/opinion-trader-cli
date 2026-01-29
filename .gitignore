@@ -8,16 +8,24 @@ wheels/
 
 # Virtual environments
 .venv
+venv/
 
 # Sensitive files - DO NOT COMMIT
 trader_configs.txt
 proxy_cache.json
-wallet/evm_result.txt
-wallet/wallet.txt
+src/opinion_trader/wallet/evm_result.txt
+src/opinion_trader/wallet/wallet.txt
+
+# Logs
+logs/
 *.log
+
+# PID files
+.trader.pid
 
 # IDE
 .idea/
+.vscode/
 
 # OS files
 .DS_Store

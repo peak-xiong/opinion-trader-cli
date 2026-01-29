@@ -3,8 +3,10 @@
 包含：合并/拆分、下单方式增强、交易汇总统计
 """
 import time
+import random
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import List, Dict, Optional, Tuple
+from datetime import datetime
 
 
 # ============ 交易汇总统计 ============
@@ -61,8 +63,7 @@ class TradeSummary:
         if self.total_trades > 0:
             total_shares = sum(t.shares for t in self.trades)
             if total_shares > 0:
-                self.avg_price = sum(
-                    t.price * t.shares for t in self.trades) / total_shares
+                self.avg_price = sum(t.price * t.shares for t in self.trades) / total_shares
 
         # 按方向统计
         if trade.side == 'buy':
@@ -71,16 +72,14 @@ class TradeSummary:
             buy_trades = [t for t in self.trades if t.side == 'buy']
             buy_shares = sum(t.shares for t in buy_trades)
             if buy_shares > 0:
-                self.buy_avg_price = sum(
-                    t.price * t.shares for t in buy_trades) / buy_shares
+                self.buy_avg_price = sum(t.price * t.shares for t in buy_trades) / buy_shares
         else:
             self.sell_amount += trade.amount
             self.sell_trades += 1
             sell_trades = [t for t in self.trades if t.side == 'sell']
             sell_shares = sum(t.shares for t in sell_trades)
             if sell_shares > 0:
-                self.sell_avg_price = sum(
-                    t.price * t.shares for t in sell_trades) / sell_shares
+                self.sell_avg_price = sum(t.price * t.shares for t in sell_trades) / sell_shares
 
     def print_summary(self, title: str = "交易汇总"):
         """打印汇总信息"""
@@ -101,11 +100,9 @@ class TradeSummary:
 
         if self.buy_trades > 0 or self.sell_trades > 0:
             print(f"\n  买入统计:")
-            print(
-                f"    笔数: {self.buy_trades}, 金额: ${self.buy_amount:.2f}, 均价: {self.buy_avg_price * 100:.2f}¢")
+            print(f"    笔数: {self.buy_trades}, 金额: ${self.buy_amount:.2f}, 均价: {self.buy_avg_price * 100:.2f}¢")
             print(f"  卖出统计:")
-            print(
-                f"    笔数: {self.sell_trades}, 金额: ${self.sell_amount:.2f}, 均价: {self.sell_avg_price * 100:.2f}¢")
+            print(f"    笔数: {self.sell_trades}, 金额: ${self.sell_amount:.2f}, 均价: {self.sell_avg_price * 100:.2f}¢")
 
         print(f"{'='*60}")
 
@@ -163,7 +160,8 @@ class OrderCalculator:
         return shares * price
 
     @staticmethod
-    def calculate_position_shares(total_balance: float, price: float, position_ratio: float) -> int:
+    def calculate_position_shares(total_balance: float, price: float,
+                                   position_ratio: float) -> int:
         """按仓位比例计算下单数量
 
         Args:
@@ -223,12 +221,10 @@ class MergeSplitService:
             result = client.merge(market_id=market_id, shares=shares)
 
             if hasattr(result, 'errno') and result.errno == 0:
-                tx_hash = result.result.tx_hash if hasattr(
-                    result.result, 'tx_hash') else ''
+                tx_hash = result.result.tx_hash if hasattr(result.result, 'tx_hash') else ''
                 return {'success': True, 'tx_hash': tx_hash}
             else:
-                error_msg = result.errmsg if hasattr(
-                    result, 'errmsg') else '合并失败'
+                error_msg = result.errmsg if hasattr(result, 'errmsg') else '合并失败'
                 return {'success': False, 'error': error_msg}
 
         except Exception as e:
@@ -256,13 +252,11 @@ class MergeSplitService:
             result = client.split(market_id=market_id, amount=amount)
 
             if hasattr(result, 'errno') and result.errno == 0:
-                tx_hash = result.result.tx_hash if hasattr(
-                    result.result, 'tx_hash') else ''
+                tx_hash = result.result.tx_hash if hasattr(result.result, 'tx_hash') else ''
                 shares = int(amount)  # 拆分份额 = 金额（1 USDT = 1份 YES + 1份 NO）
                 return {'success': True, 'tx_hash': tx_hash, 'shares': shares}
             else:
-                error_msg = result.errmsg if hasattr(
-                    result, 'errmsg') else '拆分失败'
+                error_msg = result.errmsg if hasattr(result, 'errmsg') else '拆分失败'
                 return {'success': False, 'error': error_msg}
 
         except Exception as e:
@@ -295,15 +289,9 @@ class EnhancedOrderService:
         # 交易汇总
         self.summary = TradeSummary()
 
-    def submit_buy_order(
-        self,
-        market_id: int,
-        token_id: str,
-        price: float,
-        amount: Optional[float] = None,
-        shares: Optional[int] = None,
-        skip_balance_check: bool = False
-    ) -> dict:
+    def submit_buy_order(self, market_id: int, token_id: str, price: float,
+                         amount: float = None, shares: int = None,
+                         skip_balance_check: bool = False) -> dict:
         """提交买入订单
 
         Args:
@@ -331,12 +319,10 @@ class EnhancedOrderService:
             # 计算下单参数
             if amount is not None:
                 order_amount = round(amount, 2)
-                order_shares = OrderCalculator.calculate_shares_by_amount(
-                    amount, price)
+                order_shares = OrderCalculator.calculate_shares_by_amount(amount, price)
             elif shares is not None:
                 order_shares = shares
-                order_amount = OrderCalculator.calculate_amount_by_shares(
-                    shares, price)
+                order_amount = OrderCalculator.calculate_amount_by_shares(shares, price)
             else:
                 return {'success': False, 'error': '必须指定 amount 或 shares'}
 
@@ -354,8 +340,7 @@ class EnhancedOrderService:
             response = self.client.place_order(order_data, check_approval=True)
 
             if response.errno == 0:
-                order_id = response.result.order_id if hasattr(
-                    response.result, 'order_id') else ''
+                order_id = response.result.order_id if hasattr(response.result, 'order_id') else ''
 
                 # 记录交易
                 trade = TradeRecord(
@@ -384,14 +369,8 @@ class EnhancedOrderService:
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
-    def submit_sell_order(
-        self,
-        market_id: int,
-        token_id: str,
-        price: float,
-        shares: int,
-        skip_balance_check: bool = True
-    ) -> dict:
+    def submit_sell_order(self, market_id: int, token_id: str, price: float,
+                          shares: int, skip_balance_check: bool = True) -> dict:
         """提交卖出订单
 
         注意：卖出时默认跳过余额检查，直接提交
@@ -418,8 +397,7 @@ class EnhancedOrderService:
 
         try:
             # 计算金额
-            order_amount = OrderCalculator.calculate_amount_by_shares(
-                shares, price)
+            order_amount = OrderCalculator.calculate_amount_by_shares(shares, price)
 
             # 构建订单（直接提交，不检查余额）
             order_data = PlaceOrderDataInput(
@@ -435,8 +413,7 @@ class EnhancedOrderService:
             response = self.client.place_order(order_data, check_approval=True)
 
             if response.errno == 0:
-                order_id = response.result.order_id if hasattr(
-                    response.result, 'order_id') else ''
+                order_id = response.result.order_id if hasattr(response.result, 'order_id') else ''
 
                 # 记录交易
                 trade = TradeRecord(
@@ -465,14 +442,8 @@ class EnhancedOrderService:
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
-    def submit_buy_by_position(
-        self,
-        market_id: int,
-        token_id: str,
-        price: float,
-        total_balance: float,
-        position_ratio: float
-    ) -> dict:
+    def submit_buy_by_position(self, market_id: int, token_id: str, price: float,
+                                total_balance: float, position_ratio: float) -> dict:
         """按仓位比例买入
 
         Args:
@@ -485,8 +456,7 @@ class EnhancedOrderService:
         Returns:
             同 submit_buy_order
         """
-        shares = OrderCalculator.calculate_position_shares(
-            total_balance, price, position_ratio)
+        shares = OrderCalculator.calculate_position_shares(total_balance, price, position_ratio)
         if shares <= 0:
             return {'success': False, 'error': '计算份额为0'}
 
@@ -511,7 +481,7 @@ class OrderInputHelper:
     """
 
     @staticmethod
-    def prompt_order_method() -> Optional[str]:
+    def prompt_order_method() -> str:
         """提示用户选择下单方式
 
         Returns:
@@ -606,11 +576,8 @@ class OrderInputHelper:
                 print("✗ 请输入有效的整数")
 
     @staticmethod
-    def prompt_sell_after_split(
-        bid1_price: float,
-        ask1_price: float,
-        format_price_func=None
-    ) -> Tuple[str, Optional[float]]:
+    def prompt_sell_after_split(bid1_price: float, ask1_price: float,
+                                  format_price_func=None) -> Tuple[str, Optional[float]]:
         """拆分完成后提示卖出选项
 
         Args:
