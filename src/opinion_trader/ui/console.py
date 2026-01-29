@@ -120,15 +120,16 @@ def select(prompt: str, choices: list, back_option: bool = True, back_text: str 
     q_choices = []
 
     for item in choices:
-        if isinstance(item, str):
+        # 分隔符优先检查（"---" 也是字符串，要先处理）
+        if item == "---" or item is None:
+            q_choices.append(Separator("─" * 35))
+        elif isinstance(item, str):
             q_choices.append(Choice(item, value=item))
         elif isinstance(item, tuple):
             q_choices.append(Choice(item[0], value=item[1]))
         elif isinstance(item, dict):
             q_choices.append(Choice(item.get("name", ""),
                              value=item.get("value", "")))
-        elif item == "---" or item is None:
-            q_choices.append(Separator("─" * 35))
 
     if back_option:
         q_choices.append(Separator("─" * 35))

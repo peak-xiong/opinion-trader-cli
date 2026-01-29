@@ -2969,7 +2969,8 @@ class OpinionSDKTrader:
                                 market_id=market_id)
 
                             if tx_hash:
-                                console.print(f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
+                                console.print(
+                                    f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
                                 total_claimed += 1
                             else:
                                 console.print(f"[green]✓ 成功[/green]")
@@ -3083,7 +3084,8 @@ class OpinionSDKTrader:
                         market_id=market_id)
 
                     if tx_hash:
-                        console.print(f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
+                        console.print(
+                            f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
                     else:
                         console.print(f"[green]✓ 成功[/green]")
                     success_count += 1
