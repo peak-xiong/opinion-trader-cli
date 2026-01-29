@@ -376,7 +376,7 @@ class OpinionSDKTrader:
             'https://bsc-dataseed.binance.org',
             'https://bsc.publicnode.com',
         ]
-        
+
         # 尝试不同的 RPC URL 创建客户端
         client = None
         for rpc_url in rpc_urls:
@@ -393,7 +393,7 @@ class OpinionSDKTrader:
                 break  # 创建成功，跳出循环
             except Exception:
                 continue
-        
+
         if client is None:
             # 如果所有 RPC 都失败，使用默认的
             client_params = {
@@ -492,7 +492,7 @@ class OpinionSDKTrader:
 
         # 获取市场列表
         markets = MarketListService.get_recent_markets(max_count=15)
-        
+
         if not markets:
             if MarketListService.is_loading():
                 warning("市场列表加载中，请手动输入市场ID")
@@ -507,27 +507,30 @@ class OpinionSDKTrader:
             except ValueError:
                 error("请输入有效的数字")
                 return 0
-        
+
         # 构建选择项 - 手动输入放第一行
         choices = [
             ("✏️  手动输入市场ID", "manual"),
             "---",
         ]
-        
+
         for m in markets:
             market_id = m['market_id']
             end_time = m['end_time_str']
-            title = m['title'][:35] + '...' if len(m['title']) > 35 else m['title']
+            title = m['title'][:35] + \
+                '...' if len(m['title']) > 35 else m['title']
             is_cat = m['is_categorical']
             child_markets = m.get('child_markets', [])
-            
+
             if is_cat and child_markets:
                 # 分类市场：显示为分组标题，子市场作为选项
                 choices.append("---")
-                choices.append((f"[yellow]📁 {title}[/yellow] ({end_time})", f"cat_{market_id}"))
+                choices.append(
+                    (f"[yellow]📁 {title}[/yellow] ({end_time})", f"cat_{market_id}"))
                 for child in child_markets:
                     child_id = child['market_id']
-                    child_title = child['title'][:40] + '...' if len(child['title']) > 40 else child['title']
+                    child_title = child['title'][:40] + \
+                        '...' if len(child['title']) > 40 else child['title']
                     label = f"    [cyan]{child_id:>5}[/cyan] │ {child_title}"
                     choices.append((label, child_id))
             else:
@@ -537,7 +540,7 @@ class OpinionSDKTrader:
 
         section(prompt)
         result = select("选择市场:", choices, back_option=True, back_text="返回")
-        
+
         if result is None:
             return 0
         elif result == "manual":
@@ -2953,7 +2956,7 @@ class OpinionSDKTrader:
                 for market_id, market_title in claimable_markets.items():
                     max_retries = 3
                     retry_delay = 3  # 秒
-                    success = False
+                    claimed = False
 
                     for attempt in range(max_retries):
                         try:
@@ -2966,12 +2969,12 @@ class OpinionSDKTrader:
                                 market_id=market_id)
 
                             if tx_hash:
-                                success(f"成功 (tx: {tx_hash[:16]}...)")
+                                console.print(f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
                                 total_claimed += 1
                             else:
-                                success(f"成功")
+                                console.print(f"[green]✓ 成功[/green]")
                                 total_claimed += 1
-                            success = True
+                            claimed = True
                             break  # 成功则跳出重试循环
 
                         except Exception as e:
@@ -2979,7 +2982,7 @@ class OpinionSDKTrader:
                             if 'NoPositionsToRedeem' in error_msg or 'no positions' in error_msg.lower():
                                 print(f"⊘ 无可领取 (可能已领取)")
                                 total_skipped += 1
-                                success = True  # 标记为已处理
+                                claimed = True  # 标记为已处理
                                 break
                             elif attempt < max_retries - 1:
                                 # 还有重试机会
@@ -2996,7 +2999,7 @@ class OpinionSDKTrader:
                                 total_failed += 1
 
                     # 延迟，避免请求过快
-                    if success:
+                    if claimed:
                         time.sleep(2)
 
             except Exception as e:
@@ -3080,9 +3083,9 @@ class OpinionSDKTrader:
                         market_id=market_id)
 
                     if tx_hash:
-                        success(f"成功 (tx: {tx_hash[:16]}...)")
+                        console.print(f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
                     else:
-                        success(f"成功")
+                        console.print(f"[green]✓ 成功[/green]")
                     success_count += 1
                     claimed = True
                     break  # 成功则跳出重试循环
@@ -3094,7 +3097,7 @@ class OpinionSDKTrader:
                         claimed = True  # 标记为已处理
                         break
                     elif 'non-resolved' in error_msg.lower():
-                        error(f"市场未结算")
+                        error("市场未结算")
                         fail_count += 1
                         break  # 市场未结算无需重试
                     elif attempt < max_retries - 1:
