@@ -62,7 +62,8 @@ def header(title: str, subtitle: str = None):
     """打印标题面板"""
     content = f"[bold cyan]{title}[/bold cyan]"
     if subtitle:
-        console.print(Panel.fit(content, subtitle=subtitle, border_style="blue"))
+        console.print(
+            Panel.fit(content, subtitle=subtitle, border_style="blue"))
     else:
         console.print(Panel.fit(content, border_style="blue"))
 
@@ -87,7 +88,8 @@ def rule(title: str = "", style: str = "dim"):
 def kv(key: str, value, highlight: bool = False):
     """打印键值对"""
     if highlight:
-        console.print(f"  [dim]{key}:[/dim] [bold yellow]{value}[/bold yellow]")
+        console.print(
+            f"  [dim]{key}:[/dim] [bold yellow]{value}[/bold yellow]")
     else:
         console.print(f"  [dim]{key}:[/dim] {value}")
 
@@ -102,7 +104,7 @@ def bullet(message: str, indent: int = 2):
 def select(prompt: str, choices: list, back_option: bool = True, back_text: str = "返回") -> str:
     """
     交互式单选菜单
-    
+
     Args:
         prompt: 提示文字
         choices: 选项列表，支持以下格式：
@@ -111,26 +113,27 @@ def select(prompt: str, choices: list, back_option: bool = True, back_text: str 
             - dict列表: [{"name": "显示", "value": "值"}, ...]
         back_option: 是否添加返回选项
         back_text: 返回选项的文字
-    
+
     Returns:
         选中的值，取消返回 None
     """
     q_choices = []
-    
+
     for item in choices:
         if isinstance(item, str):
             q_choices.append(Choice(item, value=item))
         elif isinstance(item, tuple):
             q_choices.append(Choice(item[0], value=item[1]))
         elif isinstance(item, dict):
-            q_choices.append(Choice(item.get("name", ""), value=item.get("value", "")))
+            q_choices.append(Choice(item.get("name", ""),
+                             value=item.get("value", "")))
         elif item == "---" or item is None:
             q_choices.append(Separator("─" * 35))
-    
+
     if back_option:
         q_choices.append(Separator("─" * 35))
         q_choices.append(Choice(f"↩️  {back_text}", value=None))
-    
+
     return questionary.select(
         prompt,
         choices=q_choices,
@@ -143,12 +146,12 @@ def select(prompt: str, choices: list, back_option: bool = True, back_text: str 
 def select_multiple(prompt: str, choices: list, min_count: int = 0) -> list:
     """
     交互式多选菜单
-    
+
     Args:
         prompt: 提示文字
         choices: 选项列表
         min_count: 最少选择数量
-    
+
     Returns:
         选中的值列表
     """
@@ -164,14 +167,14 @@ def select_multiple(prompt: str, choices: list, min_count: int = 0) -> list:
                 value=item.get("value", ""),
                 checked=item.get("checked", False)
             ))
-    
+
     result = questionary.checkbox(
         prompt,
         choices=q_choices,
         style=Q_STYLE,
         validate=lambda x: len(x) >= min_count or f"请至少选择 {min_count} 项",
     ).ask()
-    
+
     return result if result else []
 
 
@@ -209,14 +212,14 @@ def ask_int(prompt: str, default: int = None, min_val: int = None, max_val: int 
             return True
         except ValueError:
             return "请输入有效的整数"
-    
+
     result = questionary.text(
         prompt,
         default=str(default) if default is not None else "",
         validate=validate,
         style=Q_STYLE,
     ).ask()
-    
+
     if result is None:
         return default if default is not None else 0
     return int(result) if result else (default if default is not None else 0)
@@ -236,14 +239,14 @@ def ask_float(prompt: str, default: float = None, min_val: float = None, max_val
             return True
         except ValueError:
             return "请输入有效的数字"
-    
+
     result = questionary.text(
         prompt,
         default=str(default) if default is not None else "",
         validate=validate,
         style=Q_STYLE,
     ).ask()
-    
+
     if result is None:
         return default if default is not None else 0.0
     return float(result) if result else (default if default is not None else 0.0)
@@ -265,11 +268,11 @@ def pause(message: str = "按任意键继续..."):
 
 # ============ 表格 ============
 
-def table(title: str = None, columns: list = None, rows: list = None, 
-          show_header: bool = True, box_style = None):
+def table(title: str = None, columns: list = None, rows: list = None,
+          show_header: bool = True, box_style=None):
     """
     创建并打印表格
-    
+
     Args:
         title: 标题
         columns: 列定义，支持：
@@ -280,42 +283,43 @@ def table(title: str = None, columns: list = None, rows: list = None,
         box_style: 边框样式
     """
     from rich.box import ROUNDED, SIMPLE, MINIMAL
-    
+
     t = Table(
-        title=title, 
-        show_header=show_header, 
+        title=title,
+        show_header=show_header,
         header_style="bold magenta",
         box=box_style or ROUNDED,
     )
-    
+
     if columns:
         for col in columns:
             if isinstance(col, tuple):
                 t.add_column(
-                    col[0], 
+                    col[0],
                     style=col[1] if len(col) > 1 else None,
                     justify=col[2] if len(col) > 2 else "left"
                 )
             else:
                 t.add_column(str(col))
-    
+
     if rows:
         for row in rows:
             t.add_row(*[str(cell) for cell in row])
-    
+
     console.print(t)
 
 
 def create_table(title: str = None, columns: list = None) -> Table:
     """创建表格对象（用于动态添加行）"""
     from rich.box import ROUNDED
-    
-    t = Table(title=title, show_header=bool(columns), header_style="bold magenta", box=ROUNDED)
+
+    t = Table(title=title, show_header=bool(columns),
+              header_style="bold magenta", box=ROUNDED)
     if columns:
         for col in columns:
             if isinstance(col, tuple):
                 t.add_column(col[0], style=col[1] if len(col) > 1 else None,
-                            justify=col[2] if len(col) > 2 else "left")
+                             justify=col[2] if len(col) > 2 else "left")
             else:
                 t.add_column(str(col))
     return t
