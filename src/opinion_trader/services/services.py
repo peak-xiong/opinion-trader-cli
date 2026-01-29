@@ -1310,6 +1310,21 @@ class MarketListService:
         return cls._loading
 
     @classmethod
+    def get_recent_markets(cls, max_count: int = 10) -> list:
+        """获取最近到期的市场列表
+        
+        Args:
+            max_count: 最多返回数量
+            
+        Returns:
+            市场列表，每个元素包含 market_id, title, end_time_str, is_categorical, url
+        """
+        with cls._lock:
+            if not cls._loaded:
+                return []
+            return cls._markets_cache[:max_count]
+
+    @classmethod
     def display_recent_markets(cls, max_count: int = 10):
         """显示最近到期的市场列表（简洁版，用于输入市场ID时）
 

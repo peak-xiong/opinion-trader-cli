@@ -444,8 +444,8 @@ class OpinionSDKTrader:
 
         return sorted(list(selected))
 
-    def prompt_market_id(self, prompt: str = "请输入市场ID") -> int:
-        """提示用户输入市场ID，自动显示最近到期的市场列表
+    def prompt_market_id(self, prompt: str = "选择市场") -> int:
+        """提示用户选择市场，支持方向键选择或手动输入ID
 
         Args:
             prompt: 提示语
@@ -456,29 +456,65 @@ class OpinionSDKTrader:
         # 如果市场列表还没加载完成，等待一下
         import time as _time
         wait_count = 0
-        # 等待直到加载完成，或等待超时（最多5秒）
         while not MarketListService.is_loaded() and wait_count < 10:
             if wait_count == 0:
-                print("\n正在获取市场列表...")
+                info("正在获取市场列表...")
             _time.sleep(0.5)
             wait_count += 1
 
-        # 显示最近到期的市场列表
-        MarketListService.display_recent_markets(max_count=10)
-
-        while True:
-            user_input = ask(f"{prompt} (留空返回): ")
-
+        # 获取市场列表
+        markets = MarketListService.get_recent_markets(max_count=15)
+        
+        if not markets:
+            if MarketListService.is_loading():
+                warning("市场列表加载中，请手动输入市场ID")
+            else:
+                warning("暂无活跃市场")
+            # 回退到手动输入
+            user_input = ask("请输入市场ID (留空返回)")
             if not user_input:
                 return 0
-
+            try:
+                return int(user_input)
+            except ValueError:
+                error("请输入有效的数字")
+                return 0
+        
+        # 构建选择项
+        choices = []
+        for m in markets:
+            market_id = m['market_id']
+            end_time = m['end_time_str']
+            title = m['title'][:40] + '...' if len(m['title']) > 40 else m['title']
+            cat_mark = ' [分类]' if m['is_categorical'] else ''
+            label = f"[cyan]{market_id:>5}[/cyan] │ {end_time} │ {title}{cat_mark}"
+            choices.append((label, market_id))
+        
+        # 添加手动输入选项
+        choices.append("---")
+        choices.append(("✏️  手动输入市场ID", "manual"))
+        
+        section(prompt)
+        result = select("选择市场:", choices, back_option=True, back_text="返回")
+        
+        if result is None:
+            return 0
+        elif result == "manual":
+            # 手动输入
+            user_input = ask("请输入市场ID")
+            if not user_input:
+                return 0
             try:
                 market_id = int(user_input)
                 if market_id > 0:
                     return market_id
                 error("市场ID必须大于0")
+                return 0
             except ValueError:
                 error("请输入有效的数字")
+                return 0
+        else:
+            return result
 
     def split_amounts(self, total_amount: float, num_trades: int) -> List[float]:
         """拆分金额"""
