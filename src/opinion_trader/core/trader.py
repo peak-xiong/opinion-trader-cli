@@ -446,6 +446,7 @@ class OpinionSDKTrader:
 
     def prompt_market_id(self, prompt: str = "选择市场") -> int:
         """提示用户选择市场，支持方向键选择或手动输入ID
+        分类市场会自动展开显示子市场供选择
 
         Args:
             prompt: 提示语
@@ -464,7 +465,7 @@ class OpinionSDKTrader:
 
         # 获取市场列表
         markets = MarketListService.get_recent_markets(max_count=15)
-
+        
         if not markets:
             if MarketListService.is_loading():
                 warning("市场列表加载中，请手动输入市场ID")
@@ -479,23 +480,37 @@ class OpinionSDKTrader:
             except ValueError:
                 error("请输入有效的数字")
                 return 0
-
+        
         # 构建选择项 - 手动输入放第一行
         choices = [
             ("✏️  手动输入市场ID", "manual"),
             "---",
         ]
+        
         for m in markets:
             market_id = m['market_id']
             end_time = m['end_time_str']
-            title = m['title'][:40] + '...' if len(m['title']) > 40 else m['title']
-            cat_mark = ' [分类]' if m['is_categorical'] else ''
-            label = f"[cyan]{market_id:>5}[/cyan] │ {end_time} │ {title}{cat_mark}"
-            choices.append((label, market_id))
+            title = m['title'][:35] + '...' if len(m['title']) > 35 else m['title']
+            is_cat = m['is_categorical']
+            child_markets = m.get('child_markets', [])
+            
+            if is_cat and child_markets:
+                # 分类市场：显示为分组标题，子市场作为选项
+                choices.append("---")
+                choices.append((f"[yellow]📁 {title}[/yellow] ({end_time})", f"cat_{market_id}"))
+                for child in child_markets:
+                    child_id = child['market_id']
+                    child_title = child['title'][:40] + '...' if len(child['title']) > 40 else child['title']
+                    label = f"    [cyan]{child_id:>5}[/cyan] │ {child_title}"
+                    choices.append((label, child_id))
+            else:
+                # 普通市场
+                label = f"[cyan]{market_id:>5}[/cyan] │ {end_time} │ {title}"
+                choices.append((label, market_id))
 
         section(prompt)
         result = select("选择市场:", choices, back_option=True, back_text="返回")
-
+        
         if result is None:
             return 0
         elif result == "manual":
@@ -512,6 +527,10 @@ class OpinionSDKTrader:
             except ValueError:
                 error("请输入有效的数字")
                 return 0
+        elif isinstance(result, str) and result.startswith("cat_"):
+            # 选择了分类市场的父级（不应该选择）
+            warning("请选择具体的子市场")
+            return self.prompt_market_id(prompt)
         else:
             return result
 

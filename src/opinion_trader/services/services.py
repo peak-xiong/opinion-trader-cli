@@ -1185,9 +1185,21 @@ class MarketListService:
 
                     title = getattr(m, 'market_title', '') or ''
                     # 判断是否分类市场：有 child_markets 且不为空
-                    child_markets = getattr(m, 'child_markets', None)
-                    is_cat = bool(child_markets and len(child_markets) > 0)
+                    child_markets_raw = getattr(m, 'child_markets', None)
+                    is_cat = bool(child_markets_raw and len(child_markets_raw) > 0)
                     volume = float(getattr(m, 'volume', 0) or 0)
+                    
+                    # 解析子市场数据
+                    child_markets = []
+                    if is_cat and child_markets_raw:
+                        for child in child_markets_raw:
+                            child_id = getattr(child, 'market_id', None)
+                            child_title = getattr(child, 'market_title', '') or ''
+                            if child_id:
+                                child_markets.append({
+                                    'market_id': child_id,
+                                    'title': child_title,
+                                })
 
                     markets.append({
                         'market_id': market_id,
@@ -1195,6 +1207,7 @@ class MarketListService:
                         'end_time': end_time,
                         'end_time_str': end_time.strftime('%m-%d %H:%M') if end_time else '-',
                         'is_categorical': is_cat,
+                        'child_markets': child_markets,  # 预加载的子市场
                         'volume': volume,
                         'slug': '',
                         'url': f"{cls.MARKET_URL_PREFIX}{market_id}",
@@ -1312,17 +1325,50 @@ class MarketListService:
     @classmethod
     def get_recent_markets(cls, max_count: int = 10) -> list:
         """获取最近到期的市场列表
-
+        
         Args:
             max_count: 最多返回数量
-
+            
         Returns:
-            市场列表，每个元素包含 market_id, title, end_time_str, is_categorical, url
+            市场列表，每个元素包含 market_id, title, end_time_str, is_categorical, child_markets, url
         """
         with cls._lock:
             if not cls._loaded:
                 return []
             return cls._markets_cache[:max_count]
+
+    @classmethod
+    def get_child_markets(cls, market_id: int) -> list:
+        """获取指定市场的子市场列表（从缓存）
+        
+        Args:
+            market_id: 父市场ID
+            
+        Returns:
+            子市场列表，每个元素包含 market_id, title
+            如果不是分类市场或未缓存，返回空列表
+        """
+        with cls._lock:
+            for m in cls._markets_cache:
+                if m['market_id'] == market_id:
+                    return m.get('child_markets', [])
+            return []
+
+    @classmethod
+    def get_market_by_id(cls, market_id: int) -> dict:
+        """根据ID获取市场信息（从缓存）
+        
+        Args:
+            market_id: 市场ID
+            
+        Returns:
+            市场信息字典，未找到返回空字典
+        """
+        with cls._lock:
+            for m in cls._markets_cache:
+                if m['market_id'] == market_id:
+                    return m
+            return {}
 
     @classmethod
     def display_recent_markets(cls, max_count: int = 10):
