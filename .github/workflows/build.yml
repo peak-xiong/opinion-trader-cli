@@ -5,19 +5,19 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g., 3.0.0)'
+        description: "Version tag (e.g., 3.0.0)"
         required: false
-        default: '3.0.0'
-  
+        default: "3.0.0"
+
   # push 到 main 时自动触发
   push:
     branches:
       - main
     paths:
-      - 'src/**'
-      - 'build.py'
-      - 'pyproject.toml'
-      - '.github/workflows/build.yml'
+      - "src/**"
+      - "build.py"
+      - "pyproject.toml"
+      - ".github/workflows/build.yml"
 
 jobs:
   build:
@@ -39,7 +39,7 @@ jobs:
             arch: x64
 
     runs-on: ${{ matrix.os }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
@@ -73,7 +73,7 @@ jobs:
   package:
     needs: build
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
