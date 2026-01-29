@@ -367,17 +367,44 @@ class OpinionSDKTrader:
         # 如果没有代理地址，使用EOA地址作为备选
         multi_sig_addr = config.proxy_address if config.proxy_address else config.eoa_address
 
-        client_params = {
-            'host': 'https://proxy.opinion.trade:8443',
-            'apikey': config.api_key,
-            'chain_id': 56,  # BNB Chain
-            'rpc_url': 'https://bsc-dataseed.binance.org',
-            'private_key': config.private_key,
-            'multi_sig_addr': multi_sig_addr  # 使用代理地址进行交易
-        }
-
-        # 创建Client（直连模式，不使用代理）
-        client = Client(**client_params)
+        # BSC RPC 备选列表（按优先级排序）
+        rpc_urls = [
+            'https://bsc-dataseed1.binance.org',
+            'https://bsc-dataseed2.binance.org',
+            'https://bsc-dataseed3.binance.org',
+            'https://bsc-dataseed4.binance.org',
+            'https://bsc-dataseed.binance.org',
+            'https://bsc.publicnode.com',
+        ]
+        
+        # 尝试不同的 RPC URL 创建客户端
+        client = None
+        for rpc_url in rpc_urls:
+            try:
+                client_params = {
+                    'host': 'https://proxy.opinion.trade:8443',
+                    'apikey': config.api_key,
+                    'chain_id': 56,  # BNB Chain
+                    'rpc_url': rpc_url,
+                    'private_key': config.private_key,
+                    'multi_sig_addr': multi_sig_addr
+                }
+                client = Client(**client_params)
+                break  # 创建成功，跳出循环
+            except Exception:
+                continue
+        
+        if client is None:
+            # 如果所有 RPC 都失败，使用默认的
+            client_params = {
+                'host': 'https://proxy.opinion.trade:8443',
+                'apikey': config.api_key,
+                'chain_id': 56,
+                'rpc_url': 'https://bsc-dataseed1.binance.org',
+                'private_key': config.private_key,
+                'multi_sig_addr': multi_sig_addr
+            }
+            client = Client(**client_params)
 
         return client
 
