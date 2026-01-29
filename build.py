@@ -22,17 +22,40 @@ from pathlib import Path
 # 项目信息
 APP_NAME = "opinion-trader"
 APP_VERSION = "3.0.0"
-MAIN_SCRIPT = "trade.py"
 
 # 打包配置
 HIDDEN_IMPORTS = [
+    # 项目模块
+    "opinion_trader",
+    "opinion_trader.app",
+    "opinion_trader.core.trader",
+    "opinion_trader.core.enhanced",
+    "opinion_trader.config.models",
+    "opinion_trader.config.loader",
+    "opinion_trader.services.services",
+    "opinion_trader.services.orderbook_manager",
+    "opinion_trader.display.display",
+    "opinion_trader.websocket.client",
+    "opinion_trader.utils.daemon",
+    "opinion_trader.utils.confirmation",
+    "opinion_trader.utils.helpers",
+    # SDK 和依赖
     "opinion_clob_sdk",
+    "opinion_clob_sdk.chain",
+    "opinion_clob_sdk.chain.py_order_utils",
+    "opinion_clob_sdk.chain.py_order_utils.model",
     "httpx",
+    "httpx._transports",
+    "httpx._transports.default",
     "pydantic",
     "websockets",
+    "websockets.client",
     "requests",
     "socks",
     "sockshandler",
+    "json",
+    "asyncio",
+    "concurrent.futures",
 ]
 
 # 排除的模块（减小体积）
@@ -44,12 +67,7 @@ EXCLUDES = [
     "pytest",
     "setuptools",
     "pip",
-]
-
-# 需要包含的数据文件
-DATAS = [
-    # (源路径, 目标目录)
-    # ("trader_configs.txt", "."),  # 配置文件示例
+    "wheel",
 ]
 
 
@@ -83,11 +101,6 @@ def clean_build_dirs():
             print(f"  清理 {dir_name}/")
             shutil.rmtree(dir_name)
 
-    # 清理 .spec 文件
-    for spec_file in Path(".").glob("*.spec"):
-        print(f"  删除 {spec_file}")
-        spec_file.unlink()
-
 
 def check_pyinstaller():
     """检查 PyInstaller 是否安装"""
@@ -101,10 +114,38 @@ def check_pyinstaller():
         return False
 
 
+def create_entry_script():
+    """创建入口脚本"""
+    entry_script = "__entry__.py"
+    content = '''#!/usr/bin/env python3
+"""PyInstaller 入口脚本"""
+import sys
+import os
+
+# 确保当前目录在路径中
+if getattr(sys, 'frozen', False):
+    # 打包后的环境
+    app_dir = os.path.dirname(sys.executable)
+else:
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+
+os.chdir(app_dir)
+
+from opinion_trader.app import cli
+cli()
+'''
+    with open(entry_script, 'w', encoding='utf-8') as f:
+        f.write(content)
+    return entry_script
+
+
 def build_executable(onedir=False):
     """构建可执行文件"""
     platform_name, arch = get_platform_info()
     print(f"\n平台: {platform_name}-{arch}")
+
+    # 创建入口脚本
+    entry_script = create_entry_script()
 
     # 输出文件名
     if platform_name == "windows":
@@ -132,6 +173,9 @@ def build_executable(onedir=False):
     # 控制台应用
     cmd.append("--console")
 
+    # 添加 src 目录到路径
+    cmd.extend(["--paths", "src"])
+
     # 隐藏导入
     for module in HIDDEN_IMPORTS:
         cmd.extend(["--hidden-import", module])
@@ -140,19 +184,22 @@ def build_executable(onedir=False):
     for module in EXCLUDES:
         cmd.extend(["--exclude-module", module])
 
-    # 数据文件
-    for src, dst in DATAS:
-        if os.path.exists(src):
-            cmd.extend(["--add-data", f"{src}{os.pathsep}{dst}"])
+    # 收集 opinion_trader 包的所有数据
+    cmd.extend(["--collect-all", "opinion_trader"])
+    cmd.extend(["--collect-all", "opinion_clob_sdk"])
 
     # 主脚本
-    cmd.append(MAIN_SCRIPT)
+    cmd.append(entry_script)
 
-    print(f"\n执行: {' '.join(cmd)}")
+    print(f"\n执行: {' '.join(cmd[:10])}...")
     print("-" * 60)
 
     # 执行打包
     result = subprocess.run(cmd)
+
+    # 清理入口脚本
+    if os.path.exists(entry_script):
+        os.remove(entry_script)
 
     if result.returncode != 0:
         print(f"\n✗ 打包失败 (exit code: {result.returncode})")
@@ -161,8 +208,7 @@ def build_executable(onedir=False):
     # 重命名输出文件
     if onedir:
         src_path = Path("dist") / APP_NAME
-        dst_path = Path("dist") / \
-            f"{APP_NAME}-{APP_VERSION}-{platform_name}-{arch}"
+        dst_path = Path("dist") / f"{APP_NAME}-{APP_VERSION}-{platform_name}-{arch}"
     else:
         src_path = Path("dist") / (APP_NAME + exe_suffix)
         dst_path = Path("dist") / output_name
@@ -192,13 +238,15 @@ def main():
     print(f"Opinion Trader CLI 打包工具 v{APP_VERSION}")
     print("=" * 60)
 
-    # 检查主脚本
-    if not os.path.exists(MAIN_SCRIPT):
-        print(f"✗ 找不到主脚本: {MAIN_SCRIPT}")
+    # 确保在项目根目录
+    if not os.path.exists("src/opinion_trader"):
+        print("✗ 请在项目根目录运行此脚本")
         sys.exit(1)
 
     # 检查 PyInstaller
     if not check_pyinstaller():
+        print("\n安装 PyInstaller:")
+        print("  pip install pyinstaller")
         sys.exit(1)
 
     # 清理
@@ -228,6 +276,11 @@ def main():
             print("  2. 赋予执行权限: chmod +x opinion-trader-*")
             print("  3. 在同一目录创建 trader_configs.txt 配置文件")
             print("  4. 运行: ./opinion-trader-*")
+
+        print("\n跨平台打包说明:")
+        print("  - macOS 版本需要在 macOS 上打包")
+        print("  - Windows 版本需要在 Windows 上打包")
+        print("  - Linux 版本需要在 Linux 上打包")
     else:
         sys.exit(1)
 
