@@ -526,16 +526,16 @@ class OpinionSDKTrader:
                 # 分类市场：显示为分组标题，子市场作为选项
                 choices.append("---")
                 choices.append(
-                    (f"[yellow]📁 {title}[/yellow] ({end_time})", f"cat_{market_id}"))
+                    (f"📁 {title} ({end_time})", f"cat_{market_id}"))
                 for child in child_markets:
                     child_id = child['market_id']
                     child_title = child['title'][:40] + \
                         '...' if len(child['title']) > 40 else child['title']
-                    label = f"    [cyan]{child_id:>5}[/cyan] │ {child_title}"
+                    label = f"    {child_id:>5} │ {child_title}"
                     choices.append((label, child_id))
             else:
                 # 普通市场
-                label = f"[cyan]{market_id:>5}[/cyan] │ {end_time} │ {title}"
+                label = f"{market_id:>5} │ {end_time} │ {title}"
                 choices.append((label, market_id))
 
         section(prompt)
