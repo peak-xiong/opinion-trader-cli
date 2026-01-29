@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Opinion Trader CLI 打包脚本
+Opinion Trader CLI Build Script
 
-使用 PyInstaller 将应用打包为独立可执行文件
-支持 Windows、macOS、Linux
+Build standalone executables using PyInstaller
+Supports Windows, macOS, Linux
 
-用法:
-    python build.py          # 打包当前平台
-    python build.py --clean  # 清理构建目录后打包
-    python build.py --onedir # 使用 onedir 模式（默认 onefile）
+Usage:
+    python build.py          # Build for current platform
+    python build.py --clean  # Clean build directories first
+    python build.py --onedir # Use onedir mode (default: onefile)
 """
 import os
 import sys
@@ -18,14 +18,18 @@ import subprocess
 import argparse
 from pathlib import Path
 
+# Ensure UTF-8 output on Windows
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-# 项目信息
+# Project info
 APP_NAME = "opinion-trader"
 APP_VERSION = "3.0.0"
 
-# 打包配置
+# Build config
 HIDDEN_IMPORTS = [
-    # 项目模块
+    # Project modules
     "opinion_trader",
     "opinion_trader.app",
     "opinion_trader.core.trader",
@@ -39,7 +43,7 @@ HIDDEN_IMPORTS = [
     "opinion_trader.utils.daemon",
     "opinion_trader.utils.confirmation",
     "opinion_trader.utils.helpers",
-    # SDK 和依赖
+    # SDK and dependencies
     "opinion_clob_sdk",
     "opinion_clob_sdk.chain",
     "opinion_clob_sdk.chain.py_order_utils",
@@ -58,7 +62,7 @@ HIDDEN_IMPORTS = [
     "concurrent.futures",
 ]
 
-# 排除的模块（减小体积）
+# Exclude modules (reduce size)
 EXCLUDES = [
     "tkinter",
     "unittest",
@@ -72,7 +76,7 @@ EXCLUDES = [
 
 
 def get_platform_info():
-    """获取当前平台信息"""
+    """Get current platform info"""
     system = platform.system().lower()
     machine = platform.machine().lower()
 
@@ -94,37 +98,37 @@ def get_platform_info():
 
 
 def clean_build_dirs():
-    """清理构建目录"""
+    """Clean build directories"""
     dirs_to_clean = ["build", "dist", "__pycache__"]
     for dir_name in dirs_to_clean:
         if os.path.exists(dir_name):
-            print(f"  清理 {dir_name}/")
+            print(f"  Cleaning {dir_name}/")
             shutil.rmtree(dir_name)
 
 
 def check_pyinstaller():
-    """检查 PyInstaller 是否安装"""
+    """Check if PyInstaller is installed"""
     try:
         import PyInstaller
-        print(f"✓ PyInstaller {PyInstaller.__version__} 已安装")
+        print(f"[OK] PyInstaller {PyInstaller.__version__} installed")
         return True
     except ImportError:
-        print("✗ PyInstaller 未安装")
-        print("  请运行: pip install pyinstaller")
+        print("[ERROR] PyInstaller not installed")
+        print("  Please run: pip install pyinstaller")
         return False
 
 
 def create_entry_script():
-    """创建入口脚本"""
+    """Create entry script"""
     entry_script = "__entry__.py"
     content = '''#!/usr/bin/env python3
-"""PyInstaller 入口脚本"""
+"""PyInstaller entry script"""
 import sys
 import os
 
-# 确保当前目录在路径中
+# Ensure current directory in path
 if getattr(sys, 'frozen', False):
-    # 打包后的环境
+    # Packaged environment
     app_dir = os.path.dirname(sys.executable)
 else:
     app_dir = os.path.dirname(os.path.abspath(__file__))
@@ -140,14 +144,14 @@ cli()
 
 
 def build_executable(onedir=False):
-    """构建可执行文件"""
+    """Build executable"""
     platform_name, arch = get_platform_info()
-    print(f"\n平台: {platform_name}-{arch}")
+    print(f"\nPlatform: {platform_name}-{arch}")
 
-    # 创建入口脚本
+    # Create entry script
     entry_script = create_entry_script()
 
-    # 输出文件名
+    # Output filename
     if platform_name == "windows":
         exe_suffix = ".exe"
     else:
@@ -155,7 +159,7 @@ def build_executable(onedir=False):
 
     output_name = f"{APP_NAME}-{APP_VERSION}-{platform_name}-{arch}{exe_suffix}"
 
-    # 构建 PyInstaller 命令
+    # Build PyInstaller command
     cmd = [
         sys.executable,
         "-m", "PyInstaller",
@@ -164,48 +168,48 @@ def build_executable(onedir=False):
         "--noconfirm",
     ]
 
-    # 模式: onefile 或 onedir
+    # Mode: onefile or onedir
     if onedir:
         cmd.append("--onedir")
     else:
         cmd.append("--onefile")
 
-    # 控制台应用
+    # Console application
     cmd.append("--console")
 
-    # 添加 src 目录到路径
+    # Add src directory to path
     cmd.extend(["--paths", "src"])
 
-    # 隐藏导入
+    # Hidden imports
     for module in HIDDEN_IMPORTS:
         cmd.extend(["--hidden-import", module])
 
-    # 排除模块
+    # Exclude modules
     for module in EXCLUDES:
         cmd.extend(["--exclude-module", module])
 
-    # 收集 opinion_trader 包的所有数据
+    # Collect opinion_trader package data
     cmd.extend(["--collect-all", "opinion_trader"])
     cmd.extend(["--collect-all", "opinion_clob_sdk"])
 
-    # 主脚本
+    # Main script
     cmd.append(entry_script)
 
-    print(f"\n执行: {' '.join(cmd[:10])}...")
+    print(f"\nExecuting: {' '.join(cmd[:10])}...")
     print("-" * 60)
 
-    # 执行打包
+    # Execute build
     result = subprocess.run(cmd)
 
-    # 清理入口脚本
+    # Clean entry script
     if os.path.exists(entry_script):
         os.remove(entry_script)
 
     if result.returncode != 0:
-        print(f"\n✗ 打包失败 (exit code: {result.returncode})")
+        print(f"\n[ERROR] Build failed (exit code: {result.returncode})")
         return False
 
-    # 重命名输出文件
+    # Rename output file
     if onedir:
         src_path = Path("dist") / APP_NAME
         dst_path = Path("dist") / f"{APP_NAME}-{APP_VERSION}-{platform_name}-{arch}"
@@ -220,67 +224,67 @@ def build_executable(onedir=False):
             else:
                 dst_path.unlink()
         src_path.rename(dst_path)
-        print(f"\n✓ 输出: dist/{dst_path.name}")
+        print(f"\n[OK] Output: dist/{dst_path.name}")
     else:
-        print(f"\n✓ 输出: dist/{src_path.name}")
+        print(f"\n[OK] Output: dist/{src_path.name}")
 
     return True
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Opinion Trader CLI 打包脚本")
-    parser.add_argument("--clean", action="store_true", help="打包前清理构建目录")
+    parser = argparse.ArgumentParser(description="Opinion Trader CLI Build Script")
+    parser.add_argument("--clean", action="store_true", help="Clean build directories first")
     parser.add_argument("--onedir", action="store_true",
-                        help="使用 onedir 模式（默认 onefile）")
+                        help="Use onedir mode (default: onefile)")
     args = parser.parse_args()
 
     print("=" * 60)
-    print(f"Opinion Trader CLI 打包工具 v{APP_VERSION}")
+    print(f"Opinion Trader CLI Build Tool v{APP_VERSION}")
     print("=" * 60)
 
-    # 确保在项目根目录
+    # Ensure in project root
     if not os.path.exists("src/opinion_trader"):
-        print("✗ 请在项目根目录运行此脚本")
+        print("[ERROR] Please run this script from project root")
         sys.exit(1)
 
-    # 检查 PyInstaller
+    # Check PyInstaller
     if not check_pyinstaller():
-        print("\n安装 PyInstaller:")
+        print("\nInstall PyInstaller:")
         print("  pip install pyinstaller")
         sys.exit(1)
 
-    # 清理
+    # Clean
     if args.clean:
-        print("\n清理构建目录...")
+        print("\nCleaning build directories...")
         clean_build_dirs()
 
-    # 打包
-    print("\n开始打包...")
+    # Build
+    print("\nStarting build...")
     success = build_executable(onedir=args.onedir)
 
     if success:
         print("\n" + "=" * 60)
-        print("✓ 打包完成！")
+        print("[OK] Build completed!")
         print("=" * 60)
 
-        # 显示使用说明
+        # Show usage
         platform_name, _ = get_platform_info()
         if platform_name == "windows":
-            print("\n使用方法:")
-            print("  1. 将 dist/ 目录下的 .exe 文件复制到目标机器")
-            print("  2. 在同一目录创建 trader_configs.txt 配置文件")
-            print("  3. 双击运行或在命令行执行")
+            print("\nUsage:")
+            print("  1. Copy the .exe file from dist/ to target machine")
+            print("  2. Create trader_configs.txt in the same directory")
+            print("  3. Double-click to run or execute from command line")
         else:
-            print("\n使用方法:")
-            print("  1. 将 dist/ 目录下的可执行文件复制到目标机器")
-            print("  2. 赋予执行权限: chmod +x opinion-trader-*")
-            print("  3. 在同一目录创建 trader_configs.txt 配置文件")
-            print("  4. 运行: ./opinion-trader-*")
+            print("\nUsage:")
+            print("  1. Copy the executable from dist/ to target machine")
+            print("  2. Grant execute permission: chmod +x opinion-trader-*")
+            print("  3. Create trader_configs.txt in the same directory")
+            print("  4. Run: ./opinion-trader-*")
 
-        print("\n跨平台打包说明:")
-        print("  - macOS 版本需要在 macOS 上打包")
-        print("  - Windows 版本需要在 Windows 上打包")
-        print("  - Linux 版本需要在 Linux 上打包")
+        print("\nCross-platform build notes:")
+        print("  - macOS version must be built on macOS")
+        print("  - Windows version must be built on Windows")
+        print("  - Linux version must be built on Linux")
     else:
         sys.exit(1)
 
