@@ -464,7 +464,7 @@ class OpinionSDKTrader:
 
         # 获取市场列表
         markets = MarketListService.get_recent_markets(max_count=15)
-        
+
         if not markets:
             if MarketListService.is_loading():
                 warning("市场列表加载中，请手动输入市场ID")
@@ -479,9 +479,12 @@ class OpinionSDKTrader:
             except ValueError:
                 error("请输入有效的数字")
                 return 0
-        
-        # 构建选择项
-        choices = []
+
+        # 构建选择项 - 手动输入放第一行
+        choices = [
+            ("✏️  手动输入市场ID", "manual"),
+            "---",
+        ]
         for m in markets:
             market_id = m['market_id']
             end_time = m['end_time_str']
@@ -489,14 +492,10 @@ class OpinionSDKTrader:
             cat_mark = ' [分类]' if m['is_categorical'] else ''
             label = f"[cyan]{market_id:>5}[/cyan] │ {end_time} │ {title}{cat_mark}"
             choices.append((label, market_id))
-        
-        # 添加手动输入选项
-        choices.append("---")
-        choices.append(("✏️  手动输入市场ID", "manual"))
-        
+
         section(prompt)
         result = select("选择市场:", choices, back_option=True, back_text="返回")
-        
+
         if result is None:
             return 0
         elif result == "manual":
@@ -2251,7 +2250,8 @@ class OpinionSDKTrader:
                             warning(f"无卖盘，无法挂单等待")
                             print(
                                 f"     买1价格: {self.format_price(bid1_price)}¢ (立即成交)")
-                            use_bid = ask(f"     是否改用买1价格立即成交? (y/n): ").lower()
+                            use_bid = ask(
+                                f"     是否改用买1价格立即成交? (y/n): ").lower()
                             if use_bid == 'y':
                                 price = bid1_price
                                 print(
@@ -2469,7 +2469,8 @@ class OpinionSDKTrader:
                             warning(f"无卖盘，无法挂单等待")
                             print(
                                 f"     买1价格: {self.format_price(bid1_price)}¢ (立即成交)")
-                            use_bid = ask(f"     是否改用买1价格立即成交? (y/n): ").lower()
+                            use_bid = ask(
+                                f"     是否改用买1价格立即成交? (y/n): ").lower()
                             if use_bid == 'y':
                                 price = bid1_price
                                 print(
@@ -2767,14 +2768,16 @@ class OpinionSDKTrader:
             print(f"  留空返回")
 
             # 第四步：选择要撤销的订单
-            order_choice = ask(f"\n请选择要撤销的订单 (1-{len(pending_orders)}，0=全部，留空返回): ")
+            order_choice = ask(
+                f"\n请选择要撤销的订单 (1-{len(pending_orders)}，0=全部，留空返回): ")
 
             if not order_choice:
                 return
 
             if order_choice == '0':
                 # 撤销全部
-                confirm = ask(f"\n确认撤销全部 {len(pending_orders)} 个挂单? (y/n): ").lower()
+                confirm = ask(
+                    f"\n确认撤销全部 {len(pending_orders)} 个挂单? (y/n): ").lower()
                 if confirm != 'y':
                     error("已取消")
                     return
@@ -4595,7 +4598,8 @@ class OpinionSDKTrader:
                     ask1_price = float(orderbook.asks[0].price)
                     print(f"\n当前卖1价: {self.format_price(ask1_price)}¢")
 
-                    price_input = ask(f"挂单价格 (默认卖1价 {self.format_price(ask1_price)}¢): ")
+                    price_input = ask(
+                        f"挂单价格 (默认卖1价 {self.format_price(ask1_price)}¢): ")
                     if price_input:
                         sell_price = float(price_input) / 100  # 输入是分，转为美元
                     else:
@@ -4762,7 +4766,8 @@ class OpinionSDKTrader:
                 sell_pct_input = ask("卖出比例 (%)")
                 emergency_sell_percent = float(
                     sell_pct_input) if sell_pct_input else 50.0
-                confirm = ask(f"  确认紧急时市价卖出{emergency_sell_percent}%？(y/n): ").lower()
+                confirm = ask(
+                    f"  确认紧急时市价卖出{emergency_sell_percent}%？(y/n): ").lower()
                 if confirm == 'y':
                     emergency_position_action = 'sell_partial'
                 else:
@@ -5557,7 +5562,8 @@ class OpinionSDKTrader:
         import threading
 
         console.print()
-        console.print(f"[bold]做市商已启动 [WebSocket 实时模式][/bold]", justify="center")
+        console.print(f"[bold]做市商已启动 [WebSocket 实时模式][/bold]",
+                      justify="center")
         print("按 Ctrl+C 停止")
         divider("═")
 
@@ -6764,7 +6770,8 @@ class OpinionSDKTrader:
                     warning(f"价格区间太小，无法分层")
                     return None
 
-                num_levels = ask_int(f"分层数量 (2-{max_levels})", default=min(5, max_levels))
+                num_levels = ask_int(
+                    f"分层数量 (2-{max_levels})", default=min(5, max_levels))
                 num_levels = max(2, min(max_levels, num_levels))
 
                 # 将"分"转换为小数格式 (60分 -> 0.60)
@@ -7679,7 +7686,8 @@ class OpinionSDKTrader:
             if state.depth_drop_triggered:
                 status_flags.append("深度异常")
             if status_flags:
-                console.print(f"│ [yellow]![/yellow] 状态: {', '.join(status_flags)}")
+                console.print(
+                    f"│ [yellow]![/yellow] 状态: {', '.join(status_flags)}")
 
             print(f"└{'─'*56}┘")
 
@@ -7965,7 +7973,8 @@ class OpinionSDKTrader:
                         state.matched_shares += shares
 
                         profit_spread = (sell_price - buy_price) * 100
-                        success(f"[{cfg.remark}] 网格卖单成交: {shares}份 @ {self.format_price(sell_price)}¢  (买入{self.format_price(buy_price)}¢, 利润{profit_spread:.1f}¢, +${profit:.2f})")
+                        success(
+                            f"[{cfg.remark}] 网格卖单成交: {shares}份 @ {self.format_price(sell_price)}¢  (买入{self.format_price(buy_price)}¢, 利润{profit_spread:.1f}¢, +${profit:.2f})")
 
                         # 从持仓中移除对应记录
                         state.grid_positions = [p for p in state.grid_positions
@@ -8374,7 +8383,8 @@ class OpinionSDKTrader:
             if buy_amount_mode == '1':
                 while True:
                     try:
-                        total_amount = ask_float(f"请输入总金额 (最大: ${min_balance:.2f})")
+                        total_amount = ask_float(
+                            f"请输入总金额 (最大: ${min_balance:.2f})")
                         if total_amount <= 0:
                             error("金额必须大于0")
                             continue
@@ -9694,7 +9704,8 @@ class OpinionSDKTrader:
                         print(f"  {idx}. [{child_id}] {title}")
                     print(f"  0. 返回")
 
-                    choice_input = ask(f"\n请选择要卖出的子市场 (0-{len(child_markets)}): ")
+                    choice_input = ask(
+                        f"\n请选择要卖出的子市场 (0-{len(child_markets)}): ")
                     if not choice_input or choice_input == '0':
                         return
 
@@ -9934,7 +9945,8 @@ class OpinionSDKTrader:
                     print(f"  0. 返回")
 
                     # 让用户选择子市场
-                    choice_input = ask(f"\n请选择要交易的子市场 (0-{len(child_markets)}): ")
+                    choice_input = ask(
+                        f"\n请选择要交易的子市场 (0-{len(child_markets)}): ")
                     if not choice_input or choice_input == '0':
                         return
 

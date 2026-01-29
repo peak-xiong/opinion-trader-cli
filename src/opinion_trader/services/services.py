@@ -1312,10 +1312,10 @@ class MarketListService:
     @classmethod
     def get_recent_markets(cls, max_count: int = 10) -> list:
         """获取最近到期的市场列表
-        
+
         Args:
             max_count: 最多返回数量
-            
+
         Returns:
             市场列表，每个元素包含 market_id, title, end_time_str, is_categorical, url
         """
