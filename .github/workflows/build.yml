@@ -9,15 +9,10 @@ on:
         required: false
         default: "3.0.0"
 
-  # push 到 main 时自动触发
+  # 只在 main 分支更新时触发打包
   push:
     branches:
       - main
-    paths:
-      - "src/**"
-      - "build.py"
-      - "pyproject.toml"
-      - ".github/workflows/build.yml"
 
 jobs:
   build:
