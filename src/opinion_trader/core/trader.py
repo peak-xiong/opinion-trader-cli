@@ -19,10 +19,12 @@ from opinion_trader.display.display import (
 )
 from opinion_trader.config.models import TraderConfig, MarketMakerConfig, MarketMakerState
 from opinion_trader.utils.console import (
-    console, header, section, divider, menu,
+    console, header, section, divider, rule, banner, clear,
     success, error, warning, info, dim,
-    kv, bullet, ask, confirm,
-    create_table, print_table, rule
+    kv, bullet, pause,
+    select, select_multiple, confirm,
+    ask, ask_int, ask_float,
+    table, create_table, print_table,
 )
 import asyncio
 import random
@@ -1528,23 +1530,17 @@ class OpinionSDKTrader:
 
     def query_positions(self):
         """查询TOKEN持仓"""
-        print(f"\n{'='*60}")
-        print(f"{'查询TOKEN持仓':^60}")
-        print(f"{'='*60}")
-        print("  1. 查询所有持仓")
-        print("  2. 查询指定市场持仓")
-        print("  0. 返回主菜单")
+        section("查询TOKEN持仓")
+        
+        choice = select("请选择操作:", [
+            ("📊 查询所有持仓", "all"),
+            ("📍 查询指定市场持仓", "market"),
+        ])
 
-        choice = input("\n请选择 (0-2): ").strip()
-
-        if choice == '0' or not choice:
-            return
-        elif choice == '1':
+        if choice == "all":
             self.query_all_positions()
-        elif choice == '2':
+        elif choice == "market":
             self.query_market_positions()
-        else:
-            print("✗ 无效选择")
 
     def query_all_positions(self):
         """查询所有持仓"""
@@ -2513,26 +2509,20 @@ class OpinionSDKTrader:
 
     def cancel_orders_menu(self):
         """撤单菜单"""
-        print(f"\n{'='*60}")
-        print(f"{'撤销挂单':^60}")
-        print(f"{'='*60}")
-        print("  1. 撤销所有挂单")
-        print("  2. 撤销指定市场的挂单")
-        print("  3. 撤销指定订单ID")
-        print("  0. 返回主菜单")
+        section("撤销挂单")
+        
+        choice = select("请选择操作:", [
+            ("🗑️  撤销所有挂单", "all"),
+            ("📍 撤销指定市场的挂单", "market"),
+            ("🔢 撤销指定订单ID", "order"),
+        ])
 
-        cancel_choice = input("\n请选择 (0-3): ").strip()
-
-        if cancel_choice == '0':
-            return
-        elif cancel_choice == '1':
+        if choice == "all":
             self.cancel_all_orders()
-        elif cancel_choice == '2':
+        elif choice == "market":
             self.cancel_market_orders()
-        elif cancel_choice == '3':
+        elif choice == "order":
             self.cancel_specific_order()
-        else:
-            print("✗ 无效选择")
 
     def cancel_all_orders(self):
         """撤销所有挂单"""
@@ -2834,23 +2824,17 @@ class OpinionSDKTrader:
 
     def claim_menu(self):
         """Claim菜单 - 领取已结算市场的收益"""
-        print(f"\n{'='*60}")
-        print(f"{'Claim - 领取已结算市场收益':^60}")
-        print(f"{'='*60}")
-        print("  1. 自动扫描并Claim所有可领取的市场")
-        print("  2. 指定市场ID进行Claim")
-        print("  0. 返回主菜单")
+        section("Claim - 领取收益")
+        
+        choice = select("请选择操作:", [
+            ("🔍 自动扫描并Claim所有可领取的市场", "auto"),
+            ("📍 指定市场ID进行Claim", "manual"),
+        ])
 
-        claim_choice = input("\n请选择 (0-2): ").strip()
-
-        if claim_choice == '0':
-            return
-        elif claim_choice == '1':
+        if choice == "auto":
             self.claim_all_resolved()
-        elif claim_choice == '2':
+        elif choice == "manual":
             self.claim_specific_market()
-        else:
-            print("✗ 无效选择")
 
     def claim_all_resolved(self):
         """自动扫描并Claim所有可领取的市场"""
@@ -3513,9 +3497,7 @@ class OpinionSDKTrader:
         # 默认直连模式
 
         # 现在初始化所有客户端
-        print(f"\n{'='*60}")
-        print(f"{'初始化账户客户端':^60}")
-        print(f"{'='*60}")
+        section("初始化账户")
         self._init_all_clients()
         success(f"已初始化 {len(self.clients)} 个账户")
         success("市场列表服务已启动（后台自动刷新）")
@@ -3523,42 +3505,32 @@ class OpinionSDKTrader:
         # ============ 主菜单 ============
         while True:
             section("主菜单")
-            menu("请选择操作", [
-                ("1", "开始交易"),
-                ("2", "合并/拆分"),
-                ("3", "查询挂单"),
-                ("4", "撤销挂单"),
-                ("5", "查询TOKEN持仓"),
-                ("6", "查询账户资产详情"),
-                ("7", "Claim (领取已结算市场收益)"),
-                ("0", "[red]退出程序[/red]"),
-            ])
+            choice = select("请选择操作:", [
+                ("📈 开始交易", "trade"),
+                ("🔀 合并/拆分", "merge"),
+                ("📋 查询挂单", "orders"),
+                ("❌ 撤销挂单", "cancel"),
+                ("💰 查询TOKEN持仓", "position"),
+                ("💳 查询账户资产", "assets"),
+                ("🎁 Claim (领取收益)", "claim"),
+            ], back_text="退出程序")
 
-            menu_choice = ask("\n请选择", default="0")
-
-            if menu_choice == '0':
+            if choice is None:
                 success("程序退出")
                 return
-            elif menu_choice == '1':
-                # 开始交易
+            elif choice == 'trade':
                 self.trading_menu()
-            elif menu_choice == '2':
-                # 合并/拆分
+            elif choice == 'merge':
                 self.merge_split_menu()
-            elif menu_choice == '3':
-                # 查询挂单
+            elif choice == 'orders':
                 self.query_open_orders()
-            elif menu_choice == '4':
-                # 撤销挂单
+            elif choice == 'cancel':
                 self.cancel_orders_menu()
-            elif menu_choice == '5':
-                # 查询TOKEN持仓
+            elif choice == 'position':
                 self.query_positions()
-            elif menu_choice == '6':
-                # 查询账户资产详情
+            elif choice == 'assets':
                 self.query_account_assets()
-            elif menu_choice == '7':
-                # Claim领取收益
+            elif choice == 'claim':
                 self.claim_menu()
             else:
                 print("✗ 无效选择")
@@ -9076,27 +9048,19 @@ class OpinionSDKTrader:
 
     def merge_split_menu(self):
         """合并/拆分菜单"""
-        print(f"\n{'='*60}")
-        print(f"{'合并/拆分':^60}")
-        print(f"{'='*60}")
-        print("说明:")
-        print("  合并(Merge): YES + NO → USDT")
-        print("  拆分(Split): USDT → YES + NO")
-        print(f"{'─'*60}")
-        print("  1. 拆分 (USDT → YES + NO)")
-        print("  2. 合并 (YES + NO → USDT)")
-        print("  0. 返回主菜单")
+        section("合并/拆分")
+        dim("合并(Merge): YES + NO → USDT")
+        dim("拆分(Split): USDT → YES + NO")
+        
+        choice = select("请选择操作:", [
+            ("🔀 拆分 (USDT → YES + NO)", "split"),
+            ("🔄 合并 (YES + NO → USDT)", "merge"),
+        ])
 
-        choice = input("\n请选择 (0-2): ").strip()
-
-        if choice == '0' or not choice:
-            return
-        elif choice == '1':
+        if choice == "split":
             self.split_menu()
-        elif choice == '2':
+        elif choice == "merge":
             self.merge_menu()
-        else:
-            print("✗ 无效选择")
 
     def split_menu(self):
         """拆分操作菜单"""
@@ -9701,47 +9665,25 @@ class OpinionSDKTrader:
 
     def trading_menu(self):
         """交易菜单"""
-        # 1. 先选择交易模式
-        print(f"\n{'='*60}")
-        print(f"{'交易模式选择':^60}")
-        print(f"{'='*60}")
-        print("  1. 仅买入")
-        print("  2. 仅卖出")
-        print("  3. 先买后卖")
-        print("  4. 先卖后买")
-        print("  5. 自定义策略")
-        print("  6. 快速模式（买卖交替）")
-        print("  7. 低损耗模式（先买后挂单）")
-        print("  8. 挂单模式（自定义价格）")
-        print("  9. 做市商模式（双边挂单+分层）")
-        print("  10. 增强买卖（按金额/仓位+交易汇总）")
-        print("  0. 返回主菜单")
+        section("交易模式")
+        
+        trade_mode = select("请选择交易模式:", [
+            ("🟢 仅买入", "buy_only"),
+            ("🔴 仅卖出", "sell_only"),
+            ("🔄 先买后卖", "buy_then_sell"),
+            ("↩️  先卖后买", "sell_then_buy"),
+            ("⚙️  自定义策略", "custom"),
+            "---",
+            ("⚡ 快速模式（买卖交替）", "quick_mode"),
+            ("📉 低损耗模式（先买后挂单）", "low_loss_mode"),
+            ("📊 挂单模式（自定义价格）", "limit_order_mode"),
+            ("🏦 做市商模式（双边挂单）", "market_maker_mode"),
+            ("💹 增强买卖（金额/仓位）", "enhanced_mode"),
+        ])
 
-        mode_choice = input("\n请选择交易模式 (0-10): ").strip()
-
-        if mode_choice == '0':
-            return
-        elif mode_choice not in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']:
-            print("✗ 无效选择")
+        if trade_mode is None:
             return
 
-        # 映射模式
-        mode_map = {
-            '1': 'buy_only',
-            '2': 'sell_only',
-            '3': 'buy_then_sell',
-            '4': 'sell_then_buy',
-            '5': 'custom',
-            '6': 'quick_mode',
-            '7': 'low_loss_mode',
-            '8': 'limit_order_mode',
-            '9': 'market_maker_mode',
-            '10': 'enhanced_mode'
-        }
-
-        trade_mode = mode_map[mode_choice]
-
-        # 显示选择的模式
         mode_names = {
             'buy_only': '仅买入',
             'sell_only': '仅卖出',
@@ -9755,7 +9697,7 @@ class OpinionSDKTrader:
             'enhanced_mode': '增强买卖'
         }
 
-        print(f"\n✓ 已选择: {mode_names[trade_mode]}")
+        success(f"已选择: {mode_names[trade_mode]}")
 
         # 仅卖出模式：询问是卖出指定市场还是卖出所有持仓
         if trade_mode == 'sell_only':

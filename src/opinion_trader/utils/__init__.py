@@ -5,19 +5,20 @@ from opinion_trader.utils.daemon import DaemonProcess
 from opinion_trader.utils.confirmation import UserConfirmation, handle_insufficient_balance
 from opinion_trader.utils.helpers import translate_error, format_price
 from opinion_trader.utils.console import (
-    console, 
-    # 消息
+    # 核心对象
+    console,
+    # 消息输出
     success, error, warning, info, dim,
-    # 标题
-    header, section, divider, rule, banner,
+    # 标题布局
+    header, section, divider, rule, banner, clear,
     # 键值
     kv, bullet,
-    # 菜单
-    menu, menu_table,
+    # 交互式菜单 (questionary)
+    select, select_multiple, confirm, pause,
+    # 输入
+    ask, ask_int, ask_float, ask_password,
     # 表格
     table, create_table, print_table,
-    # 输入
-    ask, ask_int, ask_float, confirm, choose,
     # 进度
     spinner, progress_bar,
     # 特殊
@@ -33,15 +34,24 @@ __all__ = [
     "handle_insufficient_balance",
     "translate_error",
     "format_price",
-    # console
+    # console 核心
     "console",
+    # 消息
     "success", "error", "warning", "info", "dim",
-    "header", "section", "divider", "rule", "banner",
+    # 布局
+    "header", "section", "divider", "rule", "banner", "clear",
+    # 键值
     "kv", "bullet",
-    "menu", "menu_table",
+    # 交互
+    "select", "select_multiple", "confirm", "pause",
+    # 输入
+    "ask", "ask_int", "ask_float", "ask_password",
+    # 表格
     "table", "create_table", "print_table",
-    "ask", "ask_int", "ask_float", "confirm", "choose",
+    # 进度
     "spinner", "progress_bar",
+    # 特殊
     "code", "json_print",
+    # 打印
     "print", "log",
 ]
