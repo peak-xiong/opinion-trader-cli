@@ -1,0 +1,96 @@
+[project]
+name = "opinion-trader-cli"
+version = "3.0.0"
+description = "Opinion.trade 自动交易程序"
+readme = "使用说明.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Opinion Trader Team"}
+]
+keywords = ["opinion", "trade", "crypto", "trading", "automation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = [
+    "opinion-clob-sdk",
+    "httpx[socks]",
+    "pydantic",
+    "python-dotenv",
+    "websockets",
+    "requests",
+    "pysocks",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "isort",
+    "mypy",
+]
+build = [
+    "pyinstaller>=6.0",
+]
+
+[project.scripts]
+# 新入口（推荐）
+opinion-trader = "opinion_trader.app:cli"
+# 兼容旧入口
+trade = "trade:main"
+
+[project.urls]
+Homepage = "https://opinion.trade"
+Documentation = "https://github.com/opinion-trader-cli/docs"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["opinion_trader"]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["opinion_trader*"]
+
+[tool.setuptools.package-data]
+opinion_trader = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+    | \.venv
+    | build
+    | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = [".git", ".venv", "build", "dist"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
