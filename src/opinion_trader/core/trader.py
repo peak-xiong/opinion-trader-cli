@@ -3562,8 +3562,8 @@ class OpinionSDKTrader:
         while True:
             section("主菜单")
             choice = select("请选择操作:", [
-                ("📈 开始交易", "trade"),
                 ("🔀 合并/拆分", "merge"),
+                ("📈 开始交易", "trade"),
                 ("📋 查询挂单", "orders"),
                 ("❌ 撤销挂单", "cancel"),
                 ("💰 查询TOKEN持仓", "position"),
