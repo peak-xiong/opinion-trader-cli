@@ -18,6 +18,12 @@ from opinion_trader.display.display import (
     BalanceDisplay, OrderDisplay, OrderbookDisplay
 )
 from opinion_trader.config.models import TraderConfig, MarketMakerConfig, MarketMakerState
+from opinion_trader.utils.console import (
+    console, header, section, divider, menu,
+    success, error, warning, info, dim,
+    kv, bullet, ask, confirm,
+    create_table, print_table, rule
+)
 import asyncio
 import random
 import time
@@ -189,26 +195,22 @@ class DaemonProcess:
 # 从拆分的模块导入
 
 
-# 移除SOCKS检查（已弃用代理功能）
-
-print("="*60)
-print("Opinion.trade 自动交易程序 v2.4.9")
-print("="*60)
-print()
-print("                    版 权 声 明")
-print("-"*60)
-print("本软件受版权保护，仅授权给指定用户个人使用。")
-print()
-print("严禁以下行为：")
-print("  1. 通过互联网或其他方式传播、复制、转发本软件")
-print("  2. 出售、出租或以任何形式交易本软件")
-print("  3. 未经授权进行以盈利为目的的二次开发")
-print("  4. 将本软件提供给未经授权的第三方使用")
-print()
-print("违反上述条款将承担相应的法律责任。")
-print("-"*60)
-print()
-print("="*60 + "\n")
+# 启动 Banner
+header("Opinion.trade 自动交易程序", "v3.0.0")
+console.print()
+console.print("[bold]版权声明[/bold]", justify="center")
+divider()
+console.print("[dim]本软件受版权保护，仅授权给指定用户个人使用。[/dim]")
+console.print()
+console.print("[yellow]严禁以下行为：[/yellow]")
+bullet("通过互联网或其他方式传播、复制、转发本软件")
+bullet("出售、出租或以任何形式交易本软件")
+bullet("未经授权进行以盈利为目的的二次开发")
+bullet("将本软件提供给未经授权的第三方使用")
+console.print()
+console.print("[dim]违反上述条款将承担相应的法律责任。[/dim]")
+divider()
+console.print()
 
 # Opinion CLOB SDK imports
 
@@ -3515,27 +3517,27 @@ class OpinionSDKTrader:
         print(f"{'初始化账户客户端':^60}")
         print(f"{'='*60}")
         self._init_all_clients()
-        print(f"\n✓ 已初始化 {len(self.clients)} 个账户")
-        print(f"✓ 市场列表服务已启动（后台自动刷新）")
+        success(f"已初始化 {len(self.clients)} 个账户")
+        success("市场列表服务已启动（后台自动刷新）")
 
         # ============ 主菜单 ============
         while True:
-            print(f"\n{'='*60}")
-            print(f"{'主菜单':^60}")
-            print(f"{'='*60}")
-            print("  1. 开始交易")
-            print("  2. 合并/拆分")
-            print("  3. 查询挂单")
-            print("  4. 撤销挂单")
-            print("  5. 查询TOKEN持仓")
-            print("  6. 查询账户资产详情")
-            print("  7. Claim (领取已结算市场收益)")
-            print("  0. 退出程序")
+            section("主菜单")
+            menu("请选择操作", [
+                ("1", "开始交易"),
+                ("2", "合并/拆分"),
+                ("3", "查询挂单"),
+                ("4", "撤销挂单"),
+                ("5", "查询TOKEN持仓"),
+                ("6", "查询账户资产详情"),
+                ("7", "Claim (领取已结算市场收益)"),
+                ("0", "[red]退出程序[/red]"),
+            ])
 
-            menu_choice = input("\n请选择 (0-7): ").strip()
+            menu_choice = ask("\n请选择", default="0")
 
             if menu_choice == '0':
-                print("\n✓ 程序退出")
+                success("程序退出")
                 return
             elif menu_choice == '1':
                 # 开始交易

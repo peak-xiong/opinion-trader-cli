@@ -1,157 +1,225 @@
 """
-终端输出美化模块
-
-使用 rich 库提供美化的终端输出，同时保持向后兼容
+终端输出美化模块 - 基于 rich
 """
-try:
-    from rich.console import Console
-    from rich.table import Table
-    from rich.panel import Panel
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich import print as rprint
-    RICH_AVAILABLE = True
-except ImportError:
-    RICH_AVAILABLE = False
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.prompt import Prompt, Confirm, IntPrompt, FloatPrompt
+from rich.text import Text
+from rich.style import Style
+from rich import print as rprint
 
 # 全局 Console 实例
-console = Console() if RICH_AVAILABLE else None
+console = Console()
 
 
-def print_success(message: str):
-    """打印成功消息"""
-    if RICH_AVAILABLE:
-        console.print(f"[green]✓[/green] {message}")
-    else:
-        print(f"✓ {message}")
+# ============ 消息输出 ============
+
+def success(message: str):
+    """成功消息"""
+    console.print(f"[green]✓[/green] {message}")
 
 
-def print_error(message: str):
-    """打印错误消息"""
-    if RICH_AVAILABLE:
-        console.print(f"[red]✗[/red] {message}")
-    else:
-        print(f"✗ {message}")
+def error(message: str):
+    """错误消息"""
+    console.print(f"[red]✗[/red] {message}")
 
 
-def print_warning(message: str):
-    """打印警告消息"""
-    if RICH_AVAILABLE:
-        console.print(f"[yellow]![/yellow] {message}")
-    else:
-        print(f"! {message}")
+def warning(message: str):
+    """警告消息"""
+    console.print(f"[yellow]![/yellow] {message}")
 
 
-def print_info(message: str):
-    """打印信息消息"""
-    if RICH_AVAILABLE:
-        console.print(f"[blue]ℹ[/blue] {message}")
-    else:
-        print(f"ℹ {message}")
+def info(message: str):
+    """信息消息"""
+    console.print(f"[blue]ℹ[/blue] {message}")
 
 
-def print_header(title: str, subtitle: str = None):
-    """打印标题头"""
-    if RICH_AVAILABLE:
-        if subtitle:
-            console.print(Panel(f"[bold]{title}[/bold]\n{subtitle}", expand=False))
-        else:
-            console.print(Panel(f"[bold]{title}[/bold]", expand=False))
-    else:
-        print("=" * 60)
-        print(f"  {title}")
-        if subtitle:
-            print(f"  {subtitle}")
-        print("=" * 60)
+def dim(message: str):
+    """灰色消息"""
+    console.print(f"[dim]{message}[/dim]")
 
 
-def print_section(title: str):
+# ============ 标题和分节 ============
+
+def header(title: str, subtitle: str = None):
+    """打印标题"""
+    content = f"[bold white]{title}[/bold white]"
+    if subtitle:
+        content += f"\n[dim]{subtitle}[/dim]"
+    console.print(Panel(content, border_style="blue", expand=False))
+
+
+def section(title: str):
     """打印分节标题"""
-    if RICH_AVAILABLE:
-        console.print(f"\n[bold cyan]━━━ {title} ━━━[/bold cyan]")
-    else:
-        print(f"\n{'─' * 20} {title} {'─' * 20}")
+    console.print(f"\n[bold cyan]{'━' * 3} {title} {'━' * 40}[/bold cyan]")
 
 
-def create_table(title: str = None, columns: list = None) -> 'Table':
-    """创建表格
-    
-    Args:
-        title: 表格标题
-        columns: 列定义列表，每项可以是字符串或 (name, style) 元组
-    
-    Returns:
-        Table 对象（rich）或 None（无 rich）
-    """
-    if not RICH_AVAILABLE:
-        return None
-    
-    table = Table(title=title, show_header=True, header_style="bold")
-    if columns:
-        for col in columns:
-            if isinstance(col, tuple):
-                table.add_column(col[0], style=col[1] if len(col) > 1 else None)
-            else:
-                table.add_column(col)
-    return table
+def divider(char: str = "─", style: str = "dim"):
+    """打印分隔线"""
+    console.print(f"[{style}]{char * 60}[/{style}]")
 
 
-def print_table(table):
-    """打印表格"""
-    if RICH_AVAILABLE and table:
-        console.print(table)
+# ============ 键值对和列表 ============
 
-
-def print_key_value(key: str, value, highlight: bool = False):
+def kv(key: str, value, highlight: bool = False):
     """打印键值对"""
-    if RICH_AVAILABLE:
-        if highlight:
-            console.print(f"  [dim]{key}:[/dim] [bold]{value}[/bold]")
-        else:
-            console.print(f"  [dim]{key}:[/dim] {value}")
+    if highlight:
+        console.print(f"  [dim]{key}:[/dim] [bold yellow]{value}[/bold yellow]")
     else:
-        print(f"  {key}: {value}")
+        console.print(f"  [dim]{key}:[/dim] {value}")
 
 
-def print_menu(title: str, options: list):
-    """打印菜单选项
+def bullet(message: str, indent: int = 2):
+    """打印列表项"""
+    console.print(f"{' ' * indent}[dim]•[/dim] {message}")
+
+
+# ============ 菜单 ============
+
+def menu(title: str, options: list):
+    """打印菜单
     
     Args:
         title: 菜单标题
-        options: 选项列表，每项为 (key, description) 元组
+        options: [(key, description), ...]
     """
-    if RICH_AVAILABLE:
-        console.print(f"\n[bold]{title}[/bold]")
-        for key, desc in options:
-            console.print(f"  [cyan]{key}[/cyan]. {desc}")
-    else:
-        print(f"\n{title}")
-        for key, desc in options:
-            print(f"  {key}. {desc}")
+    console.print(f"\n[bold]{title}[/bold]")
+    for key, desc in options:
+        console.print(f"  [cyan]{key}[/cyan]. {desc}")
 
 
-def create_progress():
-    """创建进度显示器"""
-    if RICH_AVAILABLE:
-        return Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        )
-    return None
+def menu_table(title: str, options: list, columns: int = 2):
+    """打印表格形式的菜单"""
+    table = Table(title=title, show_header=False, box=None, padding=(0, 2))
+    for _ in range(columns):
+        table.add_column()
+    
+    rows = []
+    for i, (key, desc) in enumerate(options):
+        rows.append(f"[cyan]{key}[/cyan]. {desc}")
+        if len(rows) == columns:
+            table.add_row(*rows)
+            rows = []
+    if rows:
+        rows.extend([""] * (columns - len(rows)))
+        table.add_row(*rows)
+    
+    console.print(table)
 
 
-# 简化的 print 替代（可直接替换 print）
-def cprint(*args, style: str = None, **kwargs):
-    """美化的 print 函数
+# ============ 表格 ============
+
+def table(title: str = None, columns: list = None, rows: list = None):
+    """创建并打印表格
     
     Args:
-        *args: 打印内容
-        style: rich 样式（如 "bold", "red", "green"）
+        title: 标题
+        columns: 列名列表
+        rows: 行数据列表
     """
-    if RICH_AVAILABLE and style:
-        text = " ".join(str(a) for a in args)
-        console.print(f"[{style}]{text}[/{style}]", **kwargs)
-    elif RICH_AVAILABLE:
-        console.print(*args, **kwargs)
-    else:
-        print(*args, **kwargs)
+    t = Table(title=title, show_header=bool(columns), header_style="bold")
+    if columns:
+        for col in columns:
+            t.add_column(str(col))
+    if rows:
+        for row in rows:
+            t.add_row(*[str(cell) for cell in row])
+    console.print(t)
+    return t
+
+
+def create_table(title: str = None, columns: list = None) -> Table:
+    """创建表格对象"""
+    t = Table(title=title, show_header=bool(columns), header_style="bold")
+    if columns:
+        for col in columns:
+            if isinstance(col, tuple):
+                t.add_column(col[0], style=col[1] if len(col) > 1 else None, 
+                            justify=col[2] if len(col) > 2 else "left")
+            else:
+                t.add_column(str(col))
+    return t
+
+
+def print_table(t: Table):
+    """打印表格"""
+    console.print(t)
+
+
+# ============ 输入 ============
+
+def ask(prompt: str, default: str = None) -> str:
+    """文本输入"""
+    return Prompt.ask(prompt, default=default, console=console)
+
+
+def ask_int(prompt: str, default: int = None) -> int:
+    """整数输入"""
+    return IntPrompt.ask(prompt, default=default, console=console)
+
+
+def ask_float(prompt: str, default: float = None) -> float:
+    """浮点数输入"""
+    return FloatPrompt.ask(prompt, default=default, console=console)
+
+
+def confirm(prompt: str, default: bool = False) -> bool:
+    """确认输入"""
+    return Confirm.ask(prompt, default=default, console=console)
+
+
+def choose(prompt: str, choices: list, default: str = None) -> str:
+    """选择输入"""
+    return Prompt.ask(prompt, choices=choices, default=default, console=console)
+
+
+# ============ 进度 ============
+
+def spinner(message: str):
+    """创建加载动画上下文"""
+    return console.status(f"[bold blue]{message}[/bold blue]", spinner="dots")
+
+
+def progress_bar():
+    """创建进度条"""
+    return Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    )
+
+
+# ============ 特殊输出 ============
+
+def banner(text: str, style: str = "bold white on blue"):
+    """打印横幅"""
+    console.print(Panel(text, style=style, expand=True))
+
+
+def code(text: str, language: str = "python"):
+    """打印代码块"""
+    from rich.syntax import Syntax
+    syntax = Syntax(text, language, theme="monokai", line_numbers=True)
+    console.print(syntax)
+
+
+def json_print(data):
+    """美化打印 JSON"""
+    from rich.json import JSON
+    console.print(JSON.from_data(data))
+
+
+def rule(title: str = "", style: str = "dim"):
+    """打印带标题的分隔线"""
+    console.rule(title, style=style)
+
+
+# ============ 快捷函数 ============
+
+# 直接使用 console.print 的别名
+print = console.print
+log = console.log
