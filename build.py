@@ -60,6 +60,15 @@ HIDDEN_IMPORTS = [
     "json",
     "asyncio",
     "concurrent.futures",
+    # pkg_resources dependencies (for Windows)
+    "jaraco",
+    "jaraco.text",
+    "jaraco.functools",
+    "jaraco.context",
+    # UI dependencies
+    "questionary",
+    "prompt_toolkit",
+    "rich",
 ]
 
 # Exclude modules (reduce size)
@@ -69,7 +78,6 @@ EXCLUDES = [
     "test",
     "tests",
     "pytest",
-    "setuptools",
     "pip",
     "wheel",
 ]

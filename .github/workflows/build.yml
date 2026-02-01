@@ -32,7 +32,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
+          pip install opinion-clob-sdk
+          pip install questionary rich prompt_toolkit
+          pip install httpx[socks] pydantic python-dotenv websockets requests pysocks
           pip install -e .
           pip install pyinstaller
 
