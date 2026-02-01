@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = []
 binaries = []
-hiddenimports = ['opinion_trader', 'opinion_trader.app', 'opinion_trader.core.trader', 'opinion_trader.core.enhanced', 'opinion_trader.config.models', 'opinion_trader.config.loader', 'opinion_trader.services.services', 'opinion_trader.services.orderbook_manager', 'opinion_trader.display.display', 'opinion_trader.websocket.client', 'opinion_trader.utils.daemon', 'opinion_trader.utils.confirmation', 'opinion_trader.utils.helpers', 'opinion_clob_sdk', 'opinion_clob_sdk.chain', 'opinion_clob_sdk.chain.py_order_utils', 'opinion_clob_sdk.chain.py_order_utils.model', 'httpx', 'httpx._transports', 'httpx._transports.default', 'pydantic', 'websockets', 'websockets.client', 'requests', 'socks', 'sockshandler', 'json', 'asyncio', 'concurrent.futures']
+hiddenimports = ['opinion_trader', 'opinion_trader.app', 'opinion_trader.core.trader', 'opinion_trader.core.enhanced', 'opinion_trader.config.models', 'opinion_trader.config.loader', 'opinion_trader.services.services', 'opinion_trader.services.orderbook_manager', 'opinion_trader.display.display', 'opinion_trader.websocket.client', 'opinion_trader.utils.daemon', 'opinion_trader.utils.confirmation', 'opinion_trader.utils.helpers', 'opinion_clob_sdk', 'opinion_clob_sdk.chain', 'opinion_clob_sdk.chain.py_order_utils', 'opinion_clob_sdk.chain.py_order_utils.model', 'httpx', 'httpx._transports', 'httpx._transports.default', 'pydantic', 'websockets', 'websockets.client', 'requests', 'socks', 'sockshandler', 'json', 'asyncio', 'concurrent.futures', 'jaraco', 'jaraco.text', 'jaraco.functools', 'jaraco.context', 'questionary', 'prompt_toolkit', 'rich']
 tmp_ret = collect_all('opinion_trader')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('opinion_clob_sdk')
@@ -19,7 +19,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'unittest', 'test', 'tests', 'pytest', 'setuptools', 'pip', 'wheel'],
+    excludes=['tkinter', 'unittest', 'test', 'tests', 'pytest', 'pip', 'wheel'],
     noarchive=False,
     optimize=0,
 )
