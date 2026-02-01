@@ -18,6 +18,14 @@ from opinion_trader.display.display import (
     BalanceDisplay, OrderDisplay, OrderbookDisplay
 )
 from opinion_trader.config.models import TraderConfig, MarketMakerConfig, MarketMakerState
+from opinion_trader.utils.console import (
+    console, header, section, divider, rule, banner, clear,
+    success, error, warning, info, dim,
+    kv, bullet, pause,
+    select, select_multiple, confirm,
+    ask, ask_int, ask_float,
+    table, create_table, print_table,
+)
 import asyncio
 import random
 import time
@@ -87,16 +95,16 @@ class DaemonProcess:
                 try:
                     os.kill(pid, 0)
                 except OSError:
-                    print("✓ 守护进程已停止")
+                    success("守护进程已停止")
                     cls._remove_pid_file()
                     return True
             # 强制杀死
             os.kill(pid, signal.SIGKILL)
-            print("✓ 守护进程已强制停止")
+            success("守护进程已强制停止")
             cls._remove_pid_file()
             return True
         except Exception as e:
-            print(f"✗ 停止失败: {e}")
+            error(f"停止失败: {e}")
             return False
 
     @classmethod
@@ -104,7 +112,7 @@ class DaemonProcess:
         """显示守护进程状态"""
         running, pid = cls.is_running()
         if running:
-            print(f"✓ 守护进程运行中 (PID: {pid})")
+            success(f"守护进程运行中 (PID: {pid})")
             print(f"  日志文件: {os.path.abspath(cls.LOG_FILE)}")
             # 显示最后几行日志
             if os.path.exists(cls.LOG_FILE):
@@ -117,7 +125,7 @@ class DaemonProcess:
                 except:
                     pass
         else:
-            print("✗ 没有运行中的守护进程")
+            error("没有运行中的守护进程")
 
     @classmethod
     def daemonize(cls):
@@ -125,7 +133,7 @@ class DaemonProcess:
         # 检查是否已有守护进程在运行
         running, pid = cls.is_running()
         if running:
-            print(f"✗ 已有守护进程在运行 (PID: {pid})")
+            error(f"已有守护进程在运行 (PID: {pid})")
             print(f"  使用 'python trade.py stop' 停止")
             sys.exit(1)
 
@@ -134,13 +142,13 @@ class DaemonProcess:
             pid = os.fork()
             if pid > 0:
                 # 父进程退出
-                print(f"✓ 守护进程已启动")
+                success(f"守护进程已启动")
                 print(f"  日志文件: {os.path.abspath(cls.LOG_FILE)}")
                 print(f"  查看状态: python trade.py status")
                 print(f"  停止进程: python trade.py stop")
                 sys.exit(0)
         except OSError as e:
-            print(f"✗ fork失败: {e}")
+            error(f"fork失败: {e}")
             sys.exit(1)
 
         # 创建新会话
@@ -189,26 +197,22 @@ class DaemonProcess:
 # 从拆分的模块导入
 
 
-# 移除SOCKS检查（已弃用代理功能）
-
-print("="*60)
-print("Opinion.trade 自动交易程序 v2.4.9")
-print("="*60)
-print()
-print("                    版 权 声 明")
-print("-"*60)
-print("本软件受版权保护，仅授权给指定用户个人使用。")
-print()
-print("严禁以下行为：")
-print("  1. 通过互联网或其他方式传播、复制、转发本软件")
-print("  2. 出售、出租或以任何形式交易本软件")
-print("  3. 未经授权进行以盈利为目的的二次开发")
-print("  4. 将本软件提供给未经授权的第三方使用")
-print()
-print("违反上述条款将承担相应的法律责任。")
-print("-"*60)
-print()
-print("="*60 + "\n")
+# 启动 Banner
+header("Opinion.trade 自动交易程序", "v3.0.0")
+console.print()
+console.print("[bold]版权声明[/bold]", justify="center")
+divider()
+console.print("[dim]本软件受版权保护，仅授权给指定用户个人使用。[/dim]")
+console.print()
+console.print("[yellow]严禁以下行为：[/yellow]")
+bullet("通过互联网或其他方式传播、复制、转发本软件")
+bullet("出售、出租或以任何形式交易本软件")
+bullet("未经授权进行以盈利为目的的二次开发")
+bullet("将本软件提供给未经授权的第三方使用")
+console.print()
+console.print("[dim]违反上述条款将承担相应的法律责任。[/dim]")
+divider()
+console.print()
 
 # Opinion CLOB SDK imports
 
@@ -279,7 +283,7 @@ class OpinionSDKTrader:
             available = self.get_usdt_balance(config)
             return (available >= required_amount, available)
         except Exception as e:
-            print(f"  [!] 查询余额异常: {e}")
+            warning(f"查询余额异常: {e}")
             return (False, 0)
 
     def get_account_balances(self, selected_indices: list, show_progress: bool = True) -> dict:
@@ -309,14 +313,14 @@ class OpinionSDKTrader:
             ProgressBar.show_progress(total, total, prefix='查询余额', suffix='完成')
 
         # 显示查询结果
-        print()
+        console.print()
         total_balance = 0
         total_available = 0
         total_net_worth = 0
         total_portfolio = 0
         for acc_idx, remark, total_bal, available_bal, net_worth, portfolio, error in results:
             if error:
-                print(f"  账户ID:{acc_idx+1}  备注:{remark}  ✗ 查询失败")
+                error(f"账户{{acc_idx+1}} {{remark}}: 查询失败")
             else:
                 print(
                     f"  账户ID:{acc_idx+1}  备注:{remark}  总余额:{total_bal:.2f}  可用余额:{available_bal:.2f}  持仓:{portfolio:.2f}  净资产:{net_worth:.2f}")
@@ -363,17 +367,44 @@ class OpinionSDKTrader:
         # 如果没有代理地址，使用EOA地址作为备选
         multi_sig_addr = config.proxy_address if config.proxy_address else config.eoa_address
 
-        client_params = {
-            'host': 'https://proxy.opinion.trade:8443',
-            'apikey': config.api_key,
-            'chain_id': 56,  # BNB Chain
-            'rpc_url': 'https://bsc-dataseed.binance.org',
-            'private_key': config.private_key,
-            'multi_sig_addr': multi_sig_addr  # 使用代理地址进行交易
-        }
+        # BSC RPC 备选列表（按优先级排序）
+        rpc_urls = [
+            'https://bsc-dataseed1.binance.org',
+            'https://bsc-dataseed2.binance.org',
+            'https://bsc-dataseed3.binance.org',
+            'https://bsc-dataseed4.binance.org',
+            'https://bsc-dataseed.binance.org',
+            'https://bsc.publicnode.com',
+        ]
 
-        # 创建Client（直连模式，不使用代理）
-        client = Client(**client_params)
+        # 尝试不同的 RPC URL 创建客户端
+        client = None
+        for rpc_url in rpc_urls:
+            try:
+                client_params = {
+                    'host': 'https://proxy.opinion.trade:8443',
+                    'apikey': config.api_key,
+                    'chain_id': 56,  # BNB Chain
+                    'rpc_url': rpc_url,
+                    'private_key': config.private_key,
+                    'multi_sig_addr': multi_sig_addr
+                }
+                client = Client(**client_params)
+                break  # 创建成功，跳出循环
+            except Exception:
+                continue
+
+        if client is None:
+            # 如果所有 RPC 都失败，使用默认的
+            client_params = {
+                'host': 'https://proxy.opinion.trade:8443',
+                'apikey': config.api_key,
+                'chain_id': 56,
+                'rpc_url': 'https://bsc-dataseed1.binance.org',
+                'private_key': config.private_key,
+                'multi_sig_addr': multi_sig_addr
+            }
+            client = Client(**client_params)
 
         return client
 
@@ -420,7 +451,7 @@ class OpinionSDKTrader:
                         if 1 <= i <= total_accounts:
                             selected.add(i)
                 except ValueError:
-                    print(f"  [!] 忽略无效输入: {part}")
+                    warning(f"忽略无效输入: {part}")
             else:
                 # 先尝试作为备注名匹配（优先级更高）
                 if part in remark_to_idx:
@@ -436,12 +467,13 @@ class OpinionSDKTrader:
                                 f"  [!] '{part}'既不是有效账户ID(1-{total_accounts})，也不是已知备注名，已忽略")
                     except ValueError:
                         # 不是数字也不是备注名
-                        print(f"  [!] 备注名'{part}'不存在，已忽略")
+                        warning(f"备注名'{part}'不存在，已忽略")
 
         return sorted(list(selected))
 
-    def prompt_market_id(self, prompt: str = "请输入市场ID") -> int:
-        """提示用户输入市场ID，自动显示最近到期的市场列表
+    def prompt_market_id(self, prompt: str = "选择市场") -> int:
+        """提示用户选择市场，支持方向键选择或手动输入ID
+        分类市场会自动展开显示子市场供选择
 
         Args:
             prompt: 提示语
@@ -452,29 +484,85 @@ class OpinionSDKTrader:
         # 如果市场列表还没加载完成，等待一下
         import time as _time
         wait_count = 0
-        # 等待直到加载完成，或等待超时（最多5秒）
         while not MarketListService.is_loaded() and wait_count < 10:
             if wait_count == 0:
-                print("\n正在获取市场列表...")
+                info("正在获取市场列表...")
             _time.sleep(0.5)
             wait_count += 1
 
-        # 显示最近到期的市场列表
-        MarketListService.display_recent_markets(max_count=10)
+        # 获取市场列表
+        markets = MarketListService.get_recent_markets(max_count=15)
 
-        while True:
-            user_input = input(f"\n{prompt} (留空返回): ").strip()
-
+        if not markets:
+            if MarketListService.is_loading():
+                warning("市场列表加载中，请手动输入市场ID")
+            else:
+                warning("暂无活跃市场")
+            # 回退到手动输入
+            user_input = ask("请输入市场ID (留空返回)")
             if not user_input:
                 return 0
+            try:
+                return int(user_input)
+            except ValueError:
+                error("请输入有效的数字")
+                return 0
 
+        # 构建选择项 - 手动输入放第一行
+        choices = [
+            ("✏️  手动输入市场ID", "manual"),
+            "---",
+        ]
+
+        for m in markets:
+            market_id = m['market_id']
+            end_time = m['end_time_str']
+            title = m['title'][:35] + \
+                '...' if len(m['title']) > 35 else m['title']
+            is_cat = m['is_categorical']
+            child_markets = m.get('child_markets', [])
+
+            if is_cat and child_markets:
+                # 分类市场：显示为分组标题，子市场作为选项
+                choices.append("---")
+                choices.append(
+                    (f"📁 {title} ({end_time})", f"cat_{market_id}"))
+                for child in child_markets:
+                    child_id = child['market_id']
+                    child_title = child['title'][:40] + \
+                        '...' if len(child['title']) > 40 else child['title']
+                    label = f"    {child_id:>5} │ {child_title}"
+                    choices.append((label, child_id))
+            else:
+                # 普通市场
+                label = f"{market_id:>5} │ {end_time} │ {title}"
+                choices.append((label, market_id))
+
+        section(prompt)
+        result = select("选择市场:", choices, back_option=True, back_text="返回")
+
+        if result is None:
+            return 0
+        elif result == "manual":
+            # 手动输入
+            user_input = ask("请输入市场ID")
+            if not user_input:
+                return 0
             try:
                 market_id = int(user_input)
                 if market_id > 0:
                     return market_id
-                print("✗ 市场ID必须大于0")
+                error("市场ID必须大于0")
+                return 0
             except ValueError:
-                print("✗ 请输入有效的数字")
+                error("请输入有效的数字")
+                return 0
+        elif isinstance(result, str) and result.startswith("cat_"):
+            # 选择了分类市场的父级（不应该选择）
+            warning("请选择具体的子市场")
+            return self.prompt_market_id(prompt)
+        else:
+            return result
 
     def split_amounts(self, total_amount: float, num_trades: int) -> List[float]:
         """拆分金额"""
@@ -554,7 +642,7 @@ class OpinionSDKTrader:
                 return (0, 0)
             return 0
         except Exception as e:
-            print(f"  [!] 查询持仓异常: {e}")
+            warning(f"查询持仓异常: {e}")
             if return_full:
                 return (0, 0, 0, 0)
             if return_both:
@@ -618,7 +706,7 @@ class OpinionSDKTrader:
                             total_net_worth += net_worth
                             total_portfolio += portfolio
                         else:
-                            print(f"  账户ID:{idx}  备注:{remark}  [!] 无余额数据")
+                            warning(f"账户{{idx}} {{remark}}: 无余额数据")
 
                         available_amounts[idx] = usdt_balance
                     else:
@@ -631,7 +719,7 @@ class OpinionSDKTrader:
                     available_amounts[idx] = 0
 
             except Exception as e:
-                print(f"  账户ID:{idx}  备注:{remark}  ✗ 异常: {e}")
+                error(f"账户{{idx}} {{remark}}: 异常: {e}")
                 available_amounts[idx] = 0
 
         total_balance = sum(available_amounts.values())
@@ -679,7 +767,7 @@ class OpinionSDKTrader:
                     break
             except Exception as e:
                 # 记录异常但继续返回已获取的数据
-                print(f"  [!] 获取持仓分页异常: {e}")
+                warning(f"获取持仓分页异常: {e}")
                 break
 
         return all_positions
@@ -714,7 +802,7 @@ class OpinionSDKTrader:
                     break
             except Exception as e:
                 # 记录异常但继续返回已获取的数据
-                print(f"  [!] 获取订单分页异常: {e}")
+                warning(f"获取订单分页异常: {e}")
                 break
 
         return all_orders
@@ -748,10 +836,10 @@ class OpinionSDKTrader:
                             break
                 time.sleep(1)
             except Exception as e:
-                print(f"  [!] 查询订单簿异常: {e}")
+                warning(f"查询订单簿异常: {e}")
                 time.sleep(1)
 
-        print(f"  [!]  等待超时，持仓可能未及时更新")
+        warning(f"等待超时，持仓可能未及时更新")
         return False, initial_balance
 
     def get_sell_prices_reference(self, client, token_id):
@@ -763,19 +851,17 @@ class OpinionSDKTrader:
 
     def execute_quick_mode(self, client, config, market_id, token_id, selected_token_name, total_trades, min_amount, max_amount):
         """执行快速模式：买卖交替"""
-        print(f"\n{'='*60}")
-        print(f"{'开始执行快速模式':^60}")
-        print(f"{'='*60}")
+        section("开始执行快速模式")
 
         # 获取盘口数据并检查流动性
         print(f"\n正在获取盘口信息...")
         ob = OrderbookService.fetch(client, token_id)
         if not ob['success']:
-            print(f"✗ 无法获取盘口数据: {ob.get('error', '')}")
+            error(f"无法获取盘口数据: {ob.get('error', '')}")
             return
 
         if not ob['bids'] or not ob['asks']:
-            print(f"✗ 买盘或卖盘为空")
+            error(f"买盘或卖盘为空")
             return
 
         bid_depth = ob['bid_depth']
@@ -803,17 +889,17 @@ class OpinionSDKTrader:
         liquidity = OrderbookService.check_liquidity(
             ob, max_total_buy, side='buy')
         if not liquidity['sufficient']:
-            print(f"\n[!]  警告: 买入时卖盘深度可能不足!")
+            warning(f" 警告: 买入时卖盘深度可能不足!")
             print(f"  卖盘深度: ${liquidity['available']:.2f}")
             print(f"  最大可能买入: ${liquidity['required']:.2f}")
             print(f"  缺口: ${liquidity['shortage']:.2f}")
             print(f"\n  注意: 实际金额随机，可能小于最大值")
 
             if not UserConfirmation.yes_no("是否继续?"):
-                print("✗ 已取消")
+                error("已取消")
                 return
         else:
-            print(f"  ✓ 卖盘深度充足")
+            success(f"卖盘深度充足")
 
         # 同样检查卖出时的买盘深度
         sell_times = total_trades // 2
@@ -821,9 +907,9 @@ class OpinionSDKTrader:
             print(f"\n  预计卖出次数: {sell_times}")
             print(f"  买1盘口深度: ${bid_depth:.2f}")
             if bid_depth < max_total_buy:
-                print(f"  [!]  卖出时买盘深度可能不足")
+                warning(f"卖出时买盘深度可能不足")
             else:
-                print(f"  ✓ 买盘深度充足")
+                success(f"买盘深度充足")
 
         # 查询初始USDT余额
         current_usdt_balance = self.get_usdt_balance(config)
@@ -831,7 +917,7 @@ class OpinionSDKTrader:
 
         # 检查余额是否足够至少一次交易
         if current_usdt_balance < min_amount:
-            print(f"\n✗ 余额不足!")
+            error(f"余额不足!")
             print(f"  当前余额: ${current_usdt_balance:.2f}")
             print(f"  最低需要: ${min_amount:.2f}")
             print(f"  提示: 请充值或降低最低金额")
@@ -839,7 +925,7 @@ class OpinionSDKTrader:
 
         # 如果余额不够最大金额，给出警告
         if current_usdt_balance < max_amount:
-            print(f"\n[!]  警告: 余额不足以支持最大金额")
+            warning(f" 警告: 余额不足以支持最大金额")
             print(f"  当前余额: ${current_usdt_balance:.2f}")
             print(f"  最大金额: ${max_amount:.2f}")
             print(f"  将按实际余额进行交易")
@@ -864,15 +950,15 @@ class OpinionSDKTrader:
                         break
             print(f"初始持仓: {initial_position} tokens")
         except Exception as e:
-            print(f"[!]  无法查询初始持仓: {e}")
+            warning(f" 无法查询初始持仓: {e}")
 
         # 开始交易循环
         completed_trades = 0  # 实际完成的交易次数
         i = 1
         while completed_trades < total_trades:
-            print(f"\n{'─'*60}")
+            divider()
             print(f"第{i}次尝试 (已完成{completed_trades}/{total_trades})")
-            print(f"{'─'*60}")
+            divider()
 
             # 判断是买还是卖
             if completed_trades % 2 == 0:  # 偶数次完成（0,2,4...）：下一步买入
@@ -896,17 +982,17 @@ class OpinionSDKTrader:
                                 break
                         print(f"  买入前持仓: {before_buy_position} tokens")
                     else:
-                        print(f"  [!]  无法查询买入前持仓")
+                        warning(f"无法查询买入前持仓")
                         before_buy_position = initial_position
                 except Exception as e:
-                    print(f"  [!]  查询买入前持仓异常: {e}")
+                    warning(f"查询买入前持仓异常: {e}")
                     before_buy_position = initial_position
 
                 # 获取卖1价格
                 try:
                     ob = OrderbookService.fetch(client, token_id)
                     if not ob['success'] or not ob['asks']:
-                        print(f"  ✗ 无法获取盘口数据，重试...")
+                        error(f"无法获取盘口数据，重试...")
                         i += 1
                         time.sleep(2)
                         continue
@@ -928,7 +1014,7 @@ class OpinionSDKTrader:
                         order_data, check_approval=True)
 
                     if response.errno == 0:
-                        print(f"  ✓ 买入订单提交成功")
+                        success(f"买入订单提交成功")
 
                         # 等待持仓到账
                         success, new_position = self.wait_for_position_update(
@@ -970,17 +1056,17 @@ class OpinionSDKTrader:
                                         time.sleep(2)
                                         continue
                                 else:
-                                    print(f"  ✗ 无法确认持仓，重试...")
+                                    error(f"无法确认持仓，重试...")
                                     i += 1
                                     time.sleep(2)
                                     continue
                             except Exception as e:
-                                print(f"  ✗ 查询异常: {e}，重试...")
+                                error(f"查询异常: {e}，重试...")
                                 i += 1
                                 time.sleep(2)
                                 continue
                     elif response.errno == 10207:
-                        print(f"  ✗ 余额不足错误")
+                        error(f"余额不足错误")
                         try:
                             available = float(response.errmsg.split(
                                 'only ')[1].split(' available')[0])
@@ -992,11 +1078,11 @@ class OpinionSDKTrader:
                         print(f"  提示: 请降低单次交易金额或充值")
                         return
                     elif response.errno == 10403:
-                        print(f"  ✗ 地区限制错误: 你的IP地址不支持，请更换IP")
+                        error(f"地区限制错误: 你的IP地址不支持，请更换IP")
                         print(f"  提示: 检查SOCKS5代理配置是否正确，或更换非受限地区的代理")
                         return
                     else:
-                        print(f"  ✗ 买入失败: errno={response.errno}")
+                        error(f"买入失败: errno={response.errno}")
                         if hasattr(response, 'errmsg'):
                             print(f"  错误信息: {response.errmsg}")
                         i += 1
@@ -1006,12 +1092,12 @@ class OpinionSDKTrader:
                 except Exception as e:
                     error_msg = str(e)
                     if "Missing dependencies for SOCKS" in error_msg or "SOCKS" in error_msg:
-                        print(f"  ✗ SOCKS代理错误: {e}")
+                        error(f"SOCKS代理错误: {e}")
                         print(f"  提示: 请运行 'pip install pysocks' 安装SOCKS支持")
                         print(f"  或在配置文件中移除SOCKS5代理配置")
                         return
                     else:
-                        print(f"  ✗ 买入异常: {e}")
+                        error(f"买入异常: {e}")
                         i += 1
                         time.sleep(2)
                         continue
@@ -1024,7 +1110,7 @@ class OpinionSDKTrader:
                     current_position = PositionService.get_token_balance(
                         client, token_id)
                     if current_position <= 0:
-                        print(f"  [!]  当前无持仓，重试...")
+                        warning(f"当前无持仓，重试...")
                         i += 1
                         time.sleep(2)
                         continue
@@ -1034,7 +1120,7 @@ class OpinionSDKTrader:
                     # 获取买1价格
                     ob = OrderbookService.fetch(client, token_id)
                     if not ob['success'] or not ob['bids']:
-                        print(f"  ✗ 无法获取盘口数据，重试...")
+                        error(f"无法获取盘口数据，重试...")
                         i += 1
                         time.sleep(2)
                         continue
@@ -1056,7 +1142,7 @@ class OpinionSDKTrader:
                         order_data, check_approval=True)
 
                     if response.errno == 0:
-                        print(f"  ✓ 卖出订单提交成功")
+                        success(f"卖出订单提交成功")
 
                         # 等待持仓减少
                         print(f"  等待持仓更新...")
@@ -1094,7 +1180,7 @@ class OpinionSDKTrader:
                                             break
                                         time.sleep(1)
 
-                                    print(f"  ✓ 卖出完成")
+                                    success(f"卖出完成")
                                 else:
                                     print(
                                         f"  [!]  持仓未减少 (仍为{new_position})，订单可能未成交，重试...")
@@ -1102,21 +1188,21 @@ class OpinionSDKTrader:
                                     time.sleep(2)
                                     continue
                             else:
-                                print(f"  ✗ 无法确认持仓，重试...")
+                                error(f"无法确认持仓，重试...")
                                 i += 1
                                 time.sleep(2)
                                 continue
                         except Exception as e:
-                            print(f"  ✗ 查询异常: {e}，重试...")
+                            error(f"查询异常: {e}，重试...")
                             i += 1
                             time.sleep(2)
                             continue
                     elif response.errno == 10403:
-                        print(f"  ✗ 地区限制错误: 你的IP地址不支持，请更换IP")
+                        error(f"地区限制错误: 你的IP地址不支持，请更换IP")
                         print(f"  提示: 检查SOCKS5代理配置是否正确，或更换非受限地区的代理")
                         return
                     else:
-                        print(f"  ✗ 卖出失败: errno={response.errno}")
+                        error(f"卖出失败: errno={response.errno}")
                         if hasattr(response, 'errmsg'):
                             print(f"  错误信息: {response.errmsg}")
                         i += 1
@@ -1126,22 +1212,22 @@ class OpinionSDKTrader:
                 except Exception as e:
                     error_msg = str(e)
                     if "Missing dependencies for SOCKS" in error_msg or "SOCKS" in error_msg:
-                        print(f"  ✗ SOCKS代理错误: {e}")
+                        error(f"SOCKS代理错误: {e}")
                         print(f"  提示: 请运行 'pip install pysocks' 安装SOCKS支持")
                         print(f"  或在配置文件中移除SOCKS5代理配置")
                         return
                     elif "504" in error_msg or "Gateway Time-out" in error_msg:
-                        print(f"  [!] 卖出: 网关超时(504)，订单可能已提交，请稍后检查")
+                        warning(f"卖出: 网关超时(504)，订单可能已提交，请稍后检查")
                     elif "502" in error_msg or "Bad Gateway" in error_msg:
-                        print(f"  [!] 卖出: 网关错误(502)，请稍后重试")
+                        warning(f"卖出: 网关错误(502)，请稍后重试")
                     elif "503" in error_msg or "Service Unavailable" in error_msg:
-                        print(f"  [!] 卖出: 服务暂时不可用(503)，请稍后重试")
+                        warning(f"卖出: 服务暂时不可用(503)，请稍后重试")
                     elif "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
-                        print(f"  [!] 卖出: 请求超时，请检查网络连接")
+                        warning(f"卖出: 请求超时，请检查网络连接")
                     elif "Connection" in error_msg:
-                        print(f"  [!] 卖出: 连接失败，请检查网络或代理")
+                        warning(f"卖出: 连接失败，请检查网络或代理")
                     else:
-                        print(f"  ✗ 卖出异常: {e}")
+                        error(f"卖出异常: {e}")
                     i += 1
                     time.sleep(2)
                     continue
@@ -1152,9 +1238,9 @@ class OpinionSDKTrader:
 
         # 最后一次如果是奇数，询问是否挂单
         if total_trades % 2 == 1:
-            print(f"\n{'─'*60}")
+            divider()
             print("最后一次是买入，是否挂单卖出？")
-            print(f"{'─'*60}")
+            divider()
 
             if UserConfirmation.yes_no("是否挂单?"):
                 # 查询当前持仓
@@ -1173,24 +1259,24 @@ class OpinionSDKTrader:
                         print(f"  1-5: 使用卖1到卖5的价格")
                         print(f"  0: 自定义价格")
 
-                        price_choice = input("请输入选项: ").strip()
+                        price_choice = ask("请选择")
 
                         if price_choice in ['1', '2', '3', '4', '5']:
                             idx = int(price_choice) - 1
                             if idx < len(sell_prices):
                                 sell_price = sell_prices[idx][1]
                             else:
-                                print(f"[!]  选择超出范围，使用卖1")
+                                warning(f" 选择超出范围，使用卖1")
                                 sell_price = sell_prices[0][1]
                         elif price_choice == '0':
-                            custom_price = input("请输入自定义价格: ").strip()
+                            custom_price = ask("请输入自定义价格")
                             try:
                                 sell_price = float(custom_price)
                             except Exception:
-                                print(f"✗ 无效价格")
+                                error(f"无效价格")
                                 return
                         else:
-                            print(f"✗ 无效选择")
+                            error(f"无效选择")
                             return
 
                         # 执行挂单
@@ -1209,24 +1295,20 @@ class OpinionSDKTrader:
                             order_data, check_approval=True)
 
                         if response.errno == 0:
-                            print(f"✓ 挂单成功")
+                            success(f"挂单成功")
                         elif response.errno == 10403:
-                            print(f"✗ 地区限制错误: 你的IP地址不支持，请更换IP")
+                            error(f"地区限制错误: 你的IP地址不支持，请更换IP")
                             print(f"提示: 检查SOCKS5代理配置是否正确，或更换非受限地区的代理")
                         else:
-                            print(f"✗ 挂单失败: errno={response.errno}")
+                            error(f"挂单失败: errno={response.errno}")
                 else:
-                    print(f"[!]  当前无持仓")
+                    warning(f" 当前无持仓")
 
-        print(f"\n{'='*60}")
-        print(f"{'快速模式执行完成':^60}")
-        print(f"{'='*60}")
+        section("快速模式执行完成")
 
     def execute_low_loss_mode(self, client, config, market_id, token_id, selected_token_name, total_trades, min_amount, max_amount):
         """执行低损耗模式：先买后挂单"""
-        print(f"\n{'='*60}")
-        print(f"{'开始执行低损耗模式':^60}")
-        print(f"{'='*60}")
+        section("开始执行低损耗模式")
 
         # 计算买入次数和卖出次数
         buy_count = total_trades // 2
@@ -1238,11 +1320,11 @@ class OpinionSDKTrader:
         print(f"\n正在获取盘口信息...")
         ob = OrderbookService.fetch(client, token_id)
         if not ob['success']:
-            print(f"✗ 无法获取盘口数据: {ob.get('error', '')}")
+            error(f"无法获取盘口数据: {ob.get('error', '')}")
             return
 
         if not ob['bids'] or not ob['asks']:
-            print(f"✗ 买盘或卖盘为空")
+            error(f"买盘或卖盘为空")
             return
 
         ask_depth = ob['ask_depth']
@@ -1267,17 +1349,17 @@ class OpinionSDKTrader:
         liquidity = OrderbookService.check_liquidity(
             ob, max_total_buy, side='buy')
         if not liquidity['sufficient']:
-            print(f"\n[!]  警告: 买入时卖盘深度可能不足!")
+            warning(f" 警告: 买入时卖盘深度可能不足!")
             print(f"  卖盘深度: ${liquidity['available']:.2f}")
             print(f"  最大可能买入: ${liquidity['required']:.2f}")
             print(f"  缺口: ${liquidity['shortage']:.2f}")
             print(f"\n  注意: 实际金额随机，可能小于最大值")
 
             if not UserConfirmation.yes_no("是否继续?"):
-                print("✗ 已取消")
+                error("已取消")
                 return
         else:
-            print(f"  ✓ 卖盘深度充足")
+            success(f"卖盘深度充足")
 
         # 查询初始USDT余额
         current_usdt_balance = self.get_usdt_balance(config)
@@ -1291,9 +1373,9 @@ class OpinionSDKTrader:
         buy_amounts = []
 
         # 第一阶段：买入
-        print(f"{'='*60}")
+        divider("═")
         print(f"第一阶段：执行{buy_count}次买入")
-        print(f"{'='*60}")
+        divider("═")
 
         for i in range(1, buy_count + 1):
             print(f"\n【买入 {i}/{buy_count}】")
@@ -1309,7 +1391,7 @@ class OpinionSDKTrader:
             try:
                 ob = OrderbookService.fetch(client, token_id)
                 if not ob['success'] or not ob['asks']:
-                    print(f"  ✗ 无法获取盘口数据")
+                    error(f"无法获取盘口数据")
                     continue
 
                 price = ob['ask1_price']
@@ -1328,25 +1410,25 @@ class OpinionSDKTrader:
                 response = client.place_order(order_data, check_approval=True)
 
                 if response.errno == 0:
-                    print(f"  ✓ 买入成功")
+                    success(f"买入成功")
                 elif response.errno == 10403:
-                    print(f"  ✗ 地区限制错误: 你的IP地址不支持，请更换IP")
+                    error(f"地区限制错误: 你的IP地址不支持，请更换IP")
                     print(f"  提示: 检查SOCKS5代理配置是否正确，或更换非受限地区的代理")
                     return
                 else:
-                    print(f"  ✗ 买入失败: errno={response.errno}")
+                    error(f"买入失败: errno={response.errno}")
                     if hasattr(response, 'errmsg'):
                         print(f"  错误信息: {response.errmsg}")
 
             except Exception as e:
                 error_msg = str(e)
                 if "Missing dependencies for SOCKS" in error_msg or "SOCKS" in error_msg:
-                    print(f"  ✗ SOCKS代理错误: {e}")
+                    error(f"SOCKS代理错误: {e}")
                     print(f"  提示: 请运行 'pip install pysocks' 安装SOCKS支持")
                     print(f"  或在配置文件中移除SOCKS5代理配置")
                     return
                 else:
-                    print(f"  ✗ 买入异常: {e}")
+                    error(f"买入异常: {e}")
 
             # 短暂延迟
             time.sleep(1)
@@ -1357,16 +1439,16 @@ class OpinionSDKTrader:
 
         # 查询当前总持仓
         total_position = PositionService.get_token_balance(client, token_id)
-        print(f"✓ 当前总持仓: {total_position} tokens")
+        success(f"当前总持仓: {total_position} tokens")
 
         if total_position <= 0:
-            print(f"[!]  当前无持仓，无法挂卖")
+            warning(f" 当前无持仓，无法挂卖")
             return
 
         # 第二阶段：挂单卖出
-        print(f"\n{'='*60}")
+        console.print()
         print(f"第二阶段：执行{sell_count}次挂卖")
-        print(f"{'='*60}")
+        divider("═")
 
         # 显示卖1-卖5价格参考
         sell_prices = self.get_sell_prices_reference(client, token_id)
@@ -1392,7 +1474,7 @@ class OpinionSDKTrader:
                 sell_shares = remaining_position
 
             if sell_shares <= 0:
-                print(f"  [!]  无可卖数量，跳过")
+                warning(f"无可卖数量，跳过")
                 continue
 
             print(f"  数量: {sell_shares} tokens")
@@ -1402,27 +1484,27 @@ class OpinionSDKTrader:
             print(f"  1-5: 使用卖1到卖5的价格")
             print(f"  0: 自定义价格")
 
-            price_choice = input("请输入选项: ").strip()
+            price_choice = ask("请选择")
 
             if price_choice in ['1', '2', '3', '4', '5']:
                 idx = int(price_choice) - 1
                 if sell_prices and idx < len(sell_prices):
                     sell_price = sell_prices[idx][1]
                 elif sell_prices:
-                    print(f"  [!]  选择超出范围，使用卖1")
+                    warning(f"选择超出范围，使用卖1")
                     sell_price = sell_prices[0][1]
                 else:
-                    print(f"  ✗ 无法获取盘口价格")
+                    error(f"无法获取盘口价格")
                     continue
             elif price_choice == '0':
-                custom_price = input("  请输入自定义价格: ").strip()
+                custom_price = ask("请输入自定义价格")
                 try:
                     sell_price = float(custom_price)
                 except Exception:
-                    print(f"  ✗ 无效价格，跳过")
+                    error(f"无效价格，跳过")
                     continue
             else:
-                print(f"  ✗ 无效选择，跳过")
+                error(f"无效选择，跳过")
                 continue
 
             print(f"  价格: {sell_price:.6f}")
@@ -1441,48 +1523,44 @@ class OpinionSDKTrader:
                 response = client.place_order(order_data, check_approval=True)
 
                 if response.errno == 0:
-                    print(f"  ✓ 挂单成功")
+                    success(f"挂单成功")
                     remaining_position -= sell_shares
                 elif response.errno == 10403:
-                    print(f"  ✗ 地区限制错误: 你的IP地址不支持，请更换IP")
+                    error(f"地区限制错误: 你的IP地址不支持，请更换IP")
                     print(f"  提示: 检查SOCKS5代理配置是否正确，或更换非受限地区的代理")
                     return
                 else:
-                    print(f"  ✗ 挂单失败: errno={response.errno}")
+                    error(f"挂单失败: errno={response.errno}")
                     if hasattr(response, 'errmsg'):
                         print(f"  错误信息: {response.errmsg}")
 
             except Exception as e:
                 error_msg = str(e)
                 if "Missing dependencies for SOCKS" in error_msg or "SOCKS" in error_msg:
-                    print(f"  ✗ SOCKS代理错误: {e}")
+                    error(f"SOCKS代理错误: {e}")
                     print(f"  提示: 请运行 'pip install pysocks' 安装SOCKS支持")
                     print(f"  或在配置文件中移除SOCKS5代理配置")
                     return
                 else:
-                    print(f"  ✗ 挂单异常: {e}")
+                    error(f"挂单异常: {e}")
 
             # 短暂延迟
             time.sleep(1)
 
-        print(f"\n{'='*60}")
-        print(f"{'低损耗模式执行完成':^60}")
-        print(f"{'='*60}")
+        section("低损耗模式执行完成")
 
     def query_account_assets(self):
         """查询账户资产详情"""
-        print(f"\n{'='*60}")
-        print(f"{'查询账户资产详情':^60}")
-        print(f"{'='*60}")
+        section("查询账户资产详情")
 
         total_position_value = 0
         total_balance = 0
         total_net_worth = 0
 
         for idx, (client, config) in enumerate(zip(self.clients, self.configs), 1):
-            print(f"\n{'─'*60}")
+            divider()
             print(f"{config.remark}")
-            print(f"{'─'*60}")
+            divider()
 
             try:
                 # 1. 查询余额
@@ -1513,42 +1591,32 @@ class OpinionSDKTrader:
                 total_net_worth += net_worth
 
             except Exception as e:
-                print(f"  ✗ 查询异常: {e}")
+                error(f"查询异常: {e}")
 
         # 显示汇总
-        print(f"\n{'='*60}")
-        print(f"{'[#] 全部账户汇总':^60}")
-        print(f"{'='*60}")
+        section("[#] 全部账户汇总")
         print(f"  总持仓: ${total_position_value:.2f}")
         print(f"  总余额: ${total_balance:.2f}")
         print(f"  总净资产: ${total_net_worth:.2f}")
-        print(f"{'='*60}")
+        divider("═")
 
     def query_positions(self):
         """查询TOKEN持仓"""
-        print(f"\n{'='*60}")
-        print(f"{'查询TOKEN持仓':^60}")
-        print(f"{'='*60}")
-        print("  1. 查询所有持仓")
-        print("  2. 查询指定市场持仓")
-        print("  0. 返回主菜单")
+        section("查询TOKEN持仓")
 
-        choice = input("\n请选择 (0-2): ").strip()
+        choice = select("请选择操作:", [
+            ("📊 查询所有持仓", "all"),
+            ("📍 查询指定市场持仓", "market"),
+        ])
 
-        if choice == '0' or not choice:
-            return
-        elif choice == '1':
+        if choice == "all":
             self.query_all_positions()
-        elif choice == '2':
+        elif choice == "market":
             self.query_market_positions()
-        else:
-            print("✗ 无效选择")
 
     def query_all_positions(self):
         """查询所有持仓"""
-        print(f"\n{'='*60}")
-        print(f"{'查询所有账户的所有持仓':^60}")
-        print(f"{'='*60}")
+        section("查询所有账户的所有持仓")
 
         # 汇总统计
         total_value = 0
@@ -1556,9 +1624,9 @@ class OpinionSDKTrader:
 
         for idx, (client, config) in enumerate(zip(self.clients, self.configs), 1):
             try:
-                print(f"\n{'─'*60}")
+                divider()
                 print(f"{config.remark}")
-                print(f"{'─'*60}")
+                divider()
 
                 positions = self.get_all_positions(client)
 
@@ -1587,31 +1655,31 @@ class OpinionSDKTrader:
                 total_cost += account_cost
 
             except Exception as e:
-                print(f"  ✗ 查询异常: {e}")
+                error(f"查询异常: {e}")
 
         # 显示总汇总
         if total_value > 0 or total_cost > 0:
             total_pnl = total_value - total_cost
             total_pnl_pct = (total_pnl / total_cost *
                              100) if total_cost > 0 else 0
-            print(f"\n{'='*60}")
+            console.print()
             print(f"[#] 全部账户汇总:")
             print(f"   总市值: ${total_value:.2f}")
             print(f"   总成本: ${total_cost:.2f}")
             print(
                 f"   总盈亏: {'+' if total_pnl >= 0 else ''}{total_pnl:.2f} ({'+' if total_pnl_pct >= 0 else ''}{total_pnl_pct:.1f}%)")
-            print(f"{'='*60}")
+            divider("═")
 
     def query_market_positions(self):
         """查询指定市场持仓 - 按账户分组显示"""
-        market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+        market_id_input = ask("请输入市场ID")
         if not market_id_input:
             return
 
         try:
             market_id = int(market_id_input)
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         # 获取市场信息
@@ -1624,7 +1692,7 @@ class OpinionSDKTrader:
 
             if market_result['success']:
                 # 这是一个分类市场
-                print(f"\n✓ 找到分类市场: {market_result['title']}")
+                success(f"找到分类市场: {market_result['title']}")
                 child_info = market_result['children']
                 print(f"  包含 {len(child_info)} 个子市场")
 
@@ -1634,9 +1702,9 @@ class OpinionSDKTrader:
 
                 # 按账户遍历
                 for idx, (acc_client, config) in enumerate(zip(self.clients, self.configs), 1):
-                    print(f"\n{'─'*60}")
+                    divider()
                     print(f"{config.remark}")
-                    print(f"{'─'*60}")
+                    divider()
 
                     try:
                         positions = self.get_all_positions(acc_client)
@@ -1705,20 +1773,20 @@ class OpinionSDKTrader:
                         grand_total_cost += account_cost
 
                     except Exception as e:
-                        print(f"  ✗ 查询异常: {e}")
+                        error(f"查询异常: {e}")
 
                 # 显示总计
                 if grand_total_value > 0 or grand_total_cost > 0:
                     grand_total_pnl = grand_total_value - grand_total_cost
                     total_pnl_pct = (
                         grand_total_pnl / grand_total_cost * 100) if grand_total_cost > 0 else 0
-                    print(f"\n{'='*60}")
+                    console.print()
                     print(f"[#] 全部账户汇总:")
                     print(f"   总市值: ${grand_total_value:.2f}")
                     print(f"   总成本: ${grand_total_cost:.2f}")
                     print(
                         f"   总盈亏: {'+' if grand_total_pnl >= 0 else ''}{grand_total_pnl:.2f} ({'+' if total_pnl_pct >= 0 else ''}{total_pnl_pct:.1f}%)")
-                    print(f"{'='*60}")
+                    divider("═")
 
             else:
                 # 不是分类市场，作为普通市场处理
@@ -1726,7 +1794,7 @@ class OpinionSDKTrader:
                     client, market_id)
                 if not market_info['success'] or not market_info['yes_token_id']:
                     error_msg = market_info.get('error', '未知错误')
-                    print(f"✗ {error_msg}")
+                    error(f"{error_msg}")
                     return
 
                 print(f"\n市场: {market_info['title']}")
@@ -1740,9 +1808,9 @@ class OpinionSDKTrader:
 
                 # 按账户遍历
                 for idx, (acc_client, config) in enumerate(zip(self.clients, self.configs), 1):
-                    print(f"\n{'─'*60}")
+                    divider()
                     print(f"{config.remark}")
-                    print(f"{'─'*60}")
+                    divider()
 
                     try:
                         positions = self.get_all_positions(acc_client)
@@ -1814,31 +1882,29 @@ class OpinionSDKTrader:
                         total_cost += account_cost
 
                     except Exception as e:
-                        print(f"  ✗ 查询异常: {e}")
+                        error(f"查询异常: {e}")
 
                 # 显示总计
                 if total_value > 0 or total_cost > 0:
                     total_pnl = total_value - total_cost
                     pnl_pct = (total_pnl / total_cost *
                                100) if total_cost > 0 else 0
-                    print(f"\n{'='*60}")
+                    console.print()
                     print(f"[#] 全部账户汇总:")
                     print(f"   总市值: ${total_value:.2f}")
                     print(f"   总成本: ${total_cost:.2f}")
                     print(
                         f"   总盈亏: {'+' if total_pnl >= 0 else ''}{total_pnl:.2f} ({'+' if pnl_pct >= 0 else ''}{pnl_pct:.1f}%)")
-                    print(f"{'='*60}")
+                    divider("═")
 
         except Exception as e:
-            print(f"✗ 查询异常: {e}")
+            error(f"查询异常: {e}")
 
     def query_open_orders(self):
         """查询所有挂单"""
-        print(f"\n{'='*60}")
-        print(f"{'查询所有挂单':^60}")
-        print(f"{'='*60}")
+        section("查询所有挂单")
 
-        market_id_input = input("\n请输入市场ID (留空查询所有市场): ").strip()
+        market_id_input = ask("请输入市场ID (留空查询全部)")
         market_id_filter = int(market_id_input) if market_id_input else None
 
         # 如果指定了市场ID，检查是否为分类市场
@@ -1854,7 +1920,7 @@ class OpinionSDKTrader:
                     market_id=market_id_filter)
                 if categorical_response.errno == 0 and categorical_response.result and categorical_response.result.data:
                     market_data = categorical_response.result.data
-                    print(f"\n✓ 找到分类市场: {market_data.market_title}")
+                    success(f"找到分类市场: {market_data.market_title}")
                     parent_market_id = market_id_filter
                     is_categorical = True
                     if hasattr(market_data, 'child_markets') and market_data.child_markets:
@@ -1873,9 +1939,9 @@ class OpinionSDKTrader:
 
         for idx, (client, config) in enumerate(zip(self.clients, self.configs), 1):
             try:
-                print(f"\n{'─'*60}")
+                divider()
                 print(f"{config.remark}")
-                print(f"{'─'*60}")
+                divider()
 
                 orders = self.get_all_orders(client)
 
@@ -1900,7 +1966,7 @@ class OpinionSDKTrader:
                     parsed_orders, indent=2, format_price_func=self.format_price)
 
             except Exception as e:
-                print(f"✗ {config.remark} 查询异常: {e}")
+                error(f"{config.remark} 查询异常: {e}")
 
     def _execute_sell_for_market(self, market_id: int, selected_account_indices: list,
                                  market_title: str = None, cached_positions: list = None):
@@ -1912,16 +1978,14 @@ class OpinionSDKTrader:
             market_title: 市场标题（可选，避免重复查询）
             cached_positions: 已查询的持仓信息（可选，避免重复查询）
         """
-        print(f"\n{'='*60}")
-        print(f"{'卖出指定市场持仓':^60}")
-        print(f"{'='*60}")
+        section("卖出指定市场持仓")
 
         # 获取市场信息（如果没有传入）
         if not market_title:
             client = self.clients[0]
             market_response = client.get_market(market_id=market_id)
             if market_response.errno != 0 or not market_response.result or not market_response.result.data:
-                print(f"✗ 无法获取市场信息")
+                error(f"无法获取市场信息")
                 return
             market_data = market_response.result.data
             market_title = market_data.market_title if hasattr(
@@ -2051,13 +2115,13 @@ class OpinionSDKTrader:
                         total_available += available
 
                 except Exception as e:
-                    print(f"  账户ID:{idx}  {remark}: [!] 查询异常: {e}")
+                    warning(f"账户{idx} {remark}: 查询异常 - {e}")
 
         if not positions_to_sell:
-            print(f"\n✗ 选中账户在市场 {market_id} 无可卖持仓")
+            error(f"选中账户在市场 {market_id} 无可卖持仓")
             return
 
-        print(f"\n✓ 找到 {len(positions_to_sell)} 个持仓，总计 {total_available} 份")
+        success(f"找到 {len(positions_to_sell)} 个持仓，总计 {total_available} 份")
 
         # 获取盘口数据（用于分层挂单配置）
         # 优先使用持仓的token_id，否则从市场信息获取
@@ -2122,7 +2186,7 @@ class OpinionSDKTrader:
         print("  1. 限价单 (单档价格)")
         print("  2. 市价单 (立即成交)")
         print("  3. 分层挂单 (多档价格分散)")
-        sell_strategy = input("请选择 (1/2/3): ").strip()
+        sell_strategy = ask("请选择 (1/2/3)")
 
         layered_config = None
         use_market_order = False
@@ -2137,12 +2201,12 @@ class OpinionSDKTrader:
                 layered_config = self._configure_layered_order(
                     'sell', bid_details, ask_details, self.format_price)
                 if not layered_config:
-                    print("[!] 分层配置取消，自动切换为市价单")
+                    warning("分层配置取消，自动切换为市价单")
                     use_market_order = True
         elif sell_strategy == '2':
             use_market_order = True
         elif sell_strategy != '1':
-            print("✗ 无效选择")
+            error("无效选择")
             return
 
         # 如果是限价单，询问价格选择
@@ -2151,7 +2215,7 @@ class OpinionSDKTrader:
             print("\n限价单价格选择:")
             print("  1. 买1价格（直接成交）")
             print("  2. 卖1价格（挂单等待）")
-            price_choice = input("请选择 (1/2): ").strip()
+            price_choice = ask("请选择 (1/2)")
             use_bid_price = (price_choice == '1')
 
         # 确认
@@ -2163,15 +2227,13 @@ class OpinionSDKTrader:
             method_name = "买1价格（直接成交）" if use_bid_price else "卖1价格（挂单等待）"
 
         print(f"\n卖出方式: {method_name}")
-        confirm = input(f"确认卖出? (yes/no): ").strip().lower()
-        if confirm != 'yes':
-            print("✗ 已取消")
+        ok = confirm("确认执行?")
+        if not ok:
+            error("已取消")
             return
 
         # 执行卖出
-        print(f"\n{'='*60}")
-        print(f"{'开始执行卖出':^60}")
-        print(f"{'='*60}")
+        section("开始执行卖出")
 
         success_count = 0
         fail_count = 0
@@ -2203,7 +2265,7 @@ class OpinionSDKTrader:
                 # 获取当前价格
                 orderbook = client.get_orderbook(token_id=token_id)
                 if orderbook.errno != 0:
-                    print(f"  ✗ 获取盘口失败")
+                    error(f"获取盘口失败")
                     fail_count += 1
                     continue
 
@@ -2212,7 +2274,7 @@ class OpinionSDKTrader:
                     bids = sorted(orderbook.result.bids, key=lambda x: float(
                         x.price), reverse=True) if orderbook.result.bids else []
                     if not bids:
-                        print(f"  ✗ 无买盘，无法成交")
+                        error(f"无买盘，无法成交")
                         fail_count += 1
                         continue
                     price = float(bids[0].price)
@@ -2220,7 +2282,7 @@ class OpinionSDKTrader:
                     bids = sorted(orderbook.result.bids, key=lambda x: float(
                         x.price), reverse=True) if orderbook.result.bids else []
                     if not bids:
-                        print(f"  ✗ 无买盘，无法直接成交")
+                        error(f"无买盘，无法直接成交")
                         fail_count += 1
                         continue
                     price = float(bids[0].price)
@@ -2234,21 +2296,21 @@ class OpinionSDKTrader:
                             x.price), reverse=True) if orderbook.result.bids else []
                         if bids:
                             bid1_price = float(bids[0].price)
-                            print(f"  [!] 无卖盘，无法挂单等待")
+                            warning(f"无卖盘，无法挂单等待")
                             print(
                                 f"     买1价格: {self.format_price(bid1_price)}¢ (立即成交)")
-                            use_bid = input(
-                                f"     是否改用买1价格立即成交? (y/n): ").strip().lower()
+                            use_bid = ask(
+                                f"     是否改用买1价格立即成交? (y/n): ").lower()
                             if use_bid == 'y':
                                 price = bid1_price
                                 print(
                                     f"  ✓ 改用买1价格: {self.format_price(price)}¢")
                             else:
-                                print(f"  ✗ 跳过此持仓")
+                                error(f"跳过此持仓")
                                 fail_count += 1
                                 continue
                         else:
-                            print(f"  ✗ 无卖盘也无买盘，跳过此持仓")
+                            error(f"无卖盘也无买盘，跳过此持仓")
                             fail_count += 1
                             continue
 
@@ -2266,7 +2328,7 @@ class OpinionSDKTrader:
                 result = client.place_order(order_data, check_approval=True)
 
                 if result.errno == 0:
-                    print(f"  ✓ 卖出成功")
+                    success(f"卖出成功")
                     success_count += 1
                 else:
                     print(
@@ -2274,30 +2336,28 @@ class OpinionSDKTrader:
                     fail_count += 1
 
             except Exception as e:
-                print(f"  ✗ 异常: {e}")
+                error(f"异常: {e}")
                 fail_count += 1
 
             time.sleep(0.3)
 
         # 汇总
-        print(f"\n{'='*60}")
+        console.print()
         print(f"执行完成: 成功 {success_count}, 失败 {fail_count}")
-        print(f"{'='*60}")
+        divider("═")
 
     def sell_all_positions(self):
         """卖出所有持仓（一键清仓）"""
-        print(f"\n{'='*60}")
-        print(f"{'卖出所有持仓（一键清仓）':^60}")
-        print(f"{'='*60}")
+        section("卖出所有持仓（一键清仓）")
 
         # 选择卖出方式
         print("\n卖出方式选择:")
         print("  1. 买1价格（直接成交）")
         print("  2. 卖1价格（挂单等待）")
-        sell_method = input("请选择 (1/2): ").strip()
+        sell_method = ask("请选择 (1/2)")
 
         if sell_method not in ['1', '2']:
-            print("✗ 无效选择")
+            error("无效选择")
             return
 
         use_bid_price = (sell_method == '1')  # 买1价格直接成交
@@ -2393,10 +2453,10 @@ class OpinionSDKTrader:
                         continue
 
             except Exception as e:
-                print(f"  {remark}: [!] 查询异常 - {e}")
+                warning(f"{remark}: 查询异常 - {e}")
 
         if not all_positions_data:
-            print("\n✗ 所有账户均无可卖持仓")
+            error("所有账户均无可卖持仓")
             return
 
         print(
@@ -2404,15 +2464,13 @@ class OpinionSDKTrader:
         print(f"卖出方式: {method_name}")
 
         # 确认
-        confirm = input(f"\n确认卖出所有持仓? (yes/no): ").strip().lower()
-        if confirm != 'yes':
-            print("✗ 已取消")
+        confirm = ask(f"确认卖出所有持仓? (yes/no): ").lower()
+        if not ok:
+            error("已取消")
             return
 
         # 执行卖出
-        print(f"\n{'='*60}")
-        print(f"{'开始执行卖出':^60}")
-        print(f"{'='*60}")
+        section("开始执行卖出")
 
         success_count = 0
         fail_count = 0
@@ -2432,7 +2490,7 @@ class OpinionSDKTrader:
                 # 获取当前价格
                 orderbook = client.get_orderbook(token_id=token_id)
                 if orderbook.errno != 0:
-                    print(f"  ✗ 获取盘口失败")
+                    error(f"获取盘口失败")
                     fail_count += 1
                     continue
 
@@ -2441,7 +2499,7 @@ class OpinionSDKTrader:
                     bids = sorted(orderbook.result.bids, key=lambda x: float(
                         x.price), reverse=True) if orderbook.result.bids else []
                     if not bids:
-                        print(f"  ✗ 无买盘，无法直接成交")
+                        error(f"无买盘，无法直接成交")
                         fail_count += 1
                         continue
                     price = float(bids[0].price)
@@ -2457,21 +2515,21 @@ class OpinionSDKTrader:
                             x.price), reverse=True) if orderbook.result.bids else []
                         if bids:
                             bid1_price = float(bids[0].price)
-                            print(f"  [!] 无卖盘，无法挂单等待")
+                            warning(f"无卖盘，无法挂单等待")
                             print(
                                 f"     买1价格: {self.format_price(bid1_price)}¢ (立即成交)")
-                            use_bid = input(
-                                f"     是否改用买1价格立即成交? (y/n): ").strip().lower()
+                            use_bid = ask(
+                                f"     是否改用买1价格立即成交? (y/n): ").lower()
                             if use_bid == 'y':
                                 price = bid1_price
                                 print(
                                     f"  ✓ 改用买1价格: {self.format_price(price)}¢")
                             else:
-                                print(f"  ✗ 跳过此持仓")
+                                error(f"跳过此持仓")
                                 fail_count += 1
                                 continue
                         else:
-                            print(f"  ✗ 无卖盘也无买盘，跳过此持仓")
+                            error(f"无卖盘也无买盘，跳过此持仓")
                             fail_count += 1
                             continue
 
@@ -2490,7 +2548,7 @@ class OpinionSDKTrader:
                 result = client.place_order(order_data, check_approval=True)
 
                 if result.errno == 0:
-                    print(f"  ✓ 卖出成功")
+                    success(f"卖出成功")
                     success_count += 1
                 else:
                     print(
@@ -2498,47 +2556,41 @@ class OpinionSDKTrader:
                     fail_count += 1
 
             except Exception as e:
-                print(f"  ✗ 异常: {e}")
+                error(f"异常: {e}")
                 fail_count += 1
 
             # 短暂延迟避免请求过快
             time.sleep(0.3)
 
         # 汇总
-        print(f"\n{'='*60}")
+        console.print()
         print(f"执行完成: 成功 {success_count}, 失败 {fail_count}")
-        print(f"{'='*60}")
+        divider("═")
 
     def cancel_orders_menu(self):
         """撤单菜单"""
-        print(f"\n{'='*60}")
-        print(f"{'撤销挂单':^60}")
-        print(f"{'='*60}")
-        print("  1. 撤销所有挂单")
-        print("  2. 撤销指定市场的挂单")
-        print("  3. 撤销指定订单ID")
-        print("  0. 返回主菜单")
+        section("撤销挂单")
 
-        cancel_choice = input("\n请选择 (0-3): ").strip()
+        choice = select("请选择操作:", [
+            ("🗑️  撤销所有挂单", "all"),
+            ("📍 撤销指定市场的挂单", "market"),
+            ("🔢 撤销指定订单ID", "order"),
+        ])
 
-        if cancel_choice == '0':
-            return
-        elif cancel_choice == '1':
+        if choice == "all":
             self.cancel_all_orders()
-        elif cancel_choice == '2':
+        elif choice == "market":
             self.cancel_market_orders()
-        elif cancel_choice == '3':
+        elif choice == "order":
             self.cancel_specific_order()
-        else:
-            print("✗ 无效选择")
 
     def cancel_all_orders(self):
         """撤销所有挂单"""
-        print(f"\n[!]  警告: 将撤销所有账户的所有挂单！")
-        confirm = input("确认请输入 'yes': ").strip().lower()
+        warning(f" 警告: 将撤销所有账户的所有挂单！")
+        ok = confirm("确认执行此操作?")
 
-        if confirm != 'yes':
-            print("✗ 已取消")
+        if not ok:
+            error("已取消")
             return
 
         print(f"\n正在撤销所有挂单...")
@@ -2551,7 +2603,7 @@ class OpinionSDKTrader:
                 orders_response = client.get_my_orders()
 
                 if orders_response.errno != 0:
-                    print(f"  ✗ 获取订单失败")
+                    error(f"获取订单失败")
                     continue
 
                 orders = orders_response.result.list if hasattr(
@@ -2573,30 +2625,30 @@ class OpinionSDKTrader:
                             cancel_response = client.cancel_order(order_id)
                             if cancel_response.errno == 0:
                                 cancelled += 1
-                                print(f"  ✓ 撤销订单: {order_id}")
+                                success(f"撤销订单: {order_id}")
                             else:
                                 print(
                                     f"  ✗ 撤销失败 {order_id}: errno={cancel_response.errno}")
                         except Exception as e:
-                            print(f"  ✗ 撤销异常 {order_id}: {e}")
+                            error(f"撤销异常 {order_id}: {e}")
 
                 print(f"  撤销完成: {cancelled}/{len(pending_orders)}")
 
             except Exception as e:
-                print(f"  ✗ {config.remark} 异常: {e}")
+                error(f"{config.remark} 异常: {e}")
 
-        print(f"\n✓ 所有账户撤单完成")
+        success(f"所有账户撤单完成")
 
     def cancel_market_orders(self):
         """撤销指定市场的挂单"""
-        market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+        market_id_input = ask("请输入市场ID")
         if not market_id_input:
             return
 
         try:
             market_id = int(market_id_input)
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         # 检查是否为分类市场
@@ -2611,7 +2663,7 @@ class OpinionSDKTrader:
             if categorical_response.errno == 0 and categorical_response.result and categorical_response.result.data:
                 # 这是一个分类市场，获取所有子市场ID
                 market_data = categorical_response.result.data
-                print(f"\n✓ 找到分类市场: {market_data.market_title}")
+                success(f"找到分类市场: {market_data.market_title}")
 
                 if hasattr(market_data, 'child_markets') and market_data.child_markets:
                     child_market_ids = [
@@ -2626,15 +2678,15 @@ class OpinionSDKTrader:
         # 如果不是分类市场或没有子市场，就只撤销当前市场
         if not child_market_ids:
             target_market_ids = [market_id]
-            print(f"\n[!]  警告: 将撤销所有账户在市场{market_id}的挂单！")
+            warning(f" 警告: 将撤销所有账户在市场{market_id}的挂单！")
         else:
             target_market_ids = child_market_ids
-            print(f"\n[!]  警告: 将撤销所有账户在市场{market_id}及其所有子市场的挂单！")
+            warning(f" 警告: 将撤销所有账户在市场{market_id}及其所有子市场的挂单！")
 
-        confirm = input("确认请输入 'yes': ").strip().lower()
+        ok = confirm("确认执行此操作?")
 
-        if confirm != 'yes':
-            print("✗ 已取消")
+        if not ok:
+            error("已取消")
             return
 
         print(f"\n正在撤销挂单...")
@@ -2647,7 +2699,7 @@ class OpinionSDKTrader:
                 orders_response = client.get_my_orders()
 
                 if orders_response.errno != 0:
-                    print(f"  ✗ 获取订单失败")
+                    error(f"获取订单失败")
                     continue
 
                 orders = orders_response.result.list if hasattr(
@@ -2680,19 +2732,19 @@ class OpinionSDKTrader:
                                 cancel_response = client.cancel_order(order_id)
                                 if cancel_response.errno == 0:
                                     cancelled += 1
-                                    print(f"    ✓ 撤销订单: {order_id}")
+                                    success(f"撤销订单: {order_id}")
                                 else:
                                     print(
                                         f"    ✗ 撤销失败 {order_id}: errno={cancel_response.errno}")
                             except Exception as e:
-                                print(f"    ✗ 撤销异常 {order_id}: {e}")
+                                error(f"撤销异常 {order_id}: {e}")
 
                 print(f"  撤销完成: {cancelled}/{len(market_orders)}")
 
             except Exception as e:
-                print(f"  ✗ {config.remark} 异常: {e}")
+                error(f"{config.remark} 异常: {e}")
 
-        print(f"\n✓ 所有账户撤单完成")
+        success(f"所有账户撤单完成")
 
     def cancel_specific_order(self):
         """撤销指定订单 - 先选账户，再从挂单列表中选择"""
@@ -2702,7 +2754,7 @@ class OpinionSDKTrader:
             print(f"  {idx}. {config.remark}")
         print(f"  留空返回")
 
-        account_choice = input(f"\n请选择 (1-{len(self.configs)}，留空返回): ").strip()
+        account_choice = ask(f"请选择账户 (1-{len(self.configs)})")
 
         if not account_choice:
             return
@@ -2710,10 +2762,10 @@ class OpinionSDKTrader:
         try:
             account_idx = int(account_choice)
             if account_idx < 1 or account_idx > len(self.clients):
-                print("✗ 无效的账户选择")
+                error("无效的账户选择")
                 return
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         client = self.clients[account_idx - 1]
@@ -2726,7 +2778,7 @@ class OpinionSDKTrader:
             orders_response = client.get_my_orders()
 
             if orders_response.errno != 0:
-                print(f"✗ 获取订单失败: errno={orders_response.errno}")
+                error(f"获取订单失败: errno={orders_response.errno}")
                 return
 
             orders = orders_response.result.list if hasattr(
@@ -2735,15 +2787,15 @@ class OpinionSDKTrader:
                 o, 'status') and o.status == 1]
 
             if not pending_orders:
-                print(f"✓ 该账户没有挂单")
+                success(f"该账户没有挂单")
                 return
 
             # 第三步：显示挂单列表
             print(f"\n{config.remark} 的挂单列表:")
-            print(f"{'─'*80}")
+            divider()
             print(
                 f"  {'序号':<4} {'订单ID':<12} {'方向':<6} {'价格(¢)':<10} {'数量':<12} {'金额($)':<10} {'市场ID':<10}")
-            print(f"{'─'*80}")
+            divider()
 
             for i, order in enumerate(pending_orders, 1):
                 order_id = order.order_id if hasattr(
@@ -2760,23 +2812,23 @@ class OpinionSDKTrader:
                 print(
                     f"  {i:<4} {order_id:<12} {side:<6} {price:<10.1f} {size:<12.2f} {amount:<10.2f} {market_id:<10}")
 
-            print(f"{'─'*80}")
+            divider()
             print(f"  0. 撤销全部挂单 ({len(pending_orders)}个)")
             print(f"  留空返回")
 
             # 第四步：选择要撤销的订单
-            order_choice = input(
-                f"\n请选择要撤销的订单 (1-{len(pending_orders)}，0=全部，留空返回): ").strip()
+            order_choice = ask(
+                f"\n请选择要撤销的订单 (1-{len(pending_orders)}，0=全部，留空返回): ")
 
             if not order_choice:
                 return
 
             if order_choice == '0':
                 # 撤销全部
-                confirm = input(
-                    f"\n确认撤销全部 {len(pending_orders)} 个挂单? (y/n): ").strip().lower()
+                confirm = ask(
+                    f"\n确认撤销全部 {len(pending_orders)} 个挂单? (y/n): ").lower()
                 if confirm != 'y':
-                    print("✗ 已取消")
+                    error("已取消")
                     return
 
                 print(f"\n正在撤销全部挂单...")
@@ -2789,23 +2841,23 @@ class OpinionSDKTrader:
                             cancel_response = client.cancel_order(order_id)
                             if cancel_response.errno == 0:
                                 cancelled += 1
-                                print(f"  ✓ 撤销订单: {order_id}")
+                                success(f"撤销订单: {order_id}")
                             else:
                                 print(
                                     f"  ✗ 撤销失败 {order_id}: errno={cancel_response.errno}")
                         except Exception as e:
-                            print(f"  ✗ 撤销异常 {order_id}: {e}")
+                            error(f"撤销异常 {order_id}: {e}")
 
-                print(f"\n✓ 撤销完成: {cancelled}/{len(pending_orders)}")
+                success(f"撤销完成: {cancelled}/{len(pending_orders)}")
             else:
                 # 撤销指定订单
                 try:
                     order_idx = int(order_choice)
                     if order_idx < 1 or order_idx > len(pending_orders):
-                        print("✗ 无效的选择")
+                        error("无效的选择")
                         return
                 except ValueError:
-                    print("✗ 请输入有效的数字")
+                    error("请输入有效的数字")
                     return
 
                 selected_order = pending_orders[order_idx - 1]
@@ -2813,7 +2865,7 @@ class OpinionSDKTrader:
                     selected_order, 'order_id') else None
 
                 if not order_id:
-                    print("✗ 无法获取订单ID")
+                    error("无法获取订单ID")
                     return
 
                 print(f"\n正在撤销订单 {order_id}...")
@@ -2821,40 +2873,32 @@ class OpinionSDKTrader:
                 cancel_response = client.cancel_order(order_id)
 
                 if cancel_response.errno == 0:
-                    print(f"✓ 撤销成功")
+                    success(f"撤销成功")
                 else:
-                    print(f"✗ 撤销失败: errno={cancel_response.errno}")
+                    error(f"撤销失败: errno={cancel_response.errno}")
                     if hasattr(cancel_response, 'errmsg'):
                         print(f"  错误信息: {cancel_response.errmsg}")
 
         except Exception as e:
-            print(f"✗ 操作异常: {e}")
+            error(f"操作异常: {e}")
 
     def claim_menu(self):
         """Claim菜单 - 领取已结算市场的收益"""
-        print(f"\n{'='*60}")
-        print(f"{'Claim - 领取已结算市场收益':^60}")
-        print(f"{'='*60}")
-        print("  1. 自动扫描并Claim所有可领取的市场")
-        print("  2. 指定市场ID进行Claim")
-        print("  0. 返回主菜单")
+        section("Claim - 领取收益")
 
-        claim_choice = input("\n请选择 (0-2): ").strip()
+        choice = select("请选择操作:", [
+            ("🔍 自动扫描并Claim所有可领取的市场", "auto"),
+            ("📍 指定市场ID进行Claim", "manual"),
+        ])
 
-        if claim_choice == '0':
-            return
-        elif claim_choice == '1':
+        if choice == "auto":
             self.claim_all_resolved()
-        elif claim_choice == '2':
+        elif choice == "manual":
             self.claim_specific_market()
-        else:
-            print("✗ 无效选择")
 
     def claim_all_resolved(self):
         """自动扫描并Claim所有可领取的市场"""
-        print(f"\n{'='*60}")
-        print(f"{'扫描所有账户的可Claim持仓':^60}")
-        print(f"{'='*60}")
+        section("扫描所有账户的可Claim持仓")
 
         # 统计信息
         total_claimed = 0
@@ -2863,14 +2907,14 @@ class OpinionSDKTrader:
 
         for idx, (client, config) in enumerate(zip(self.clients, self.configs), 1):
             print(f"\n{config.remark}")
-            print(f"{'─'*40}")
+            divider()
 
             try:
                 # 获取所有持仓
                 positions_response = client.get_my_positions()
 
                 if positions_response.errno != 0:
-                    print(f"  ✗ 获取持仓失败: errno={positions_response.errno}")
+                    error(f"获取持仓失败: errno={positions_response.errno}")
                     continue
 
                 positions = positions_response.result.list if hasattr(
@@ -2912,7 +2956,7 @@ class OpinionSDKTrader:
                 for market_id, market_title in claimable_markets.items():
                     max_retries = 3
                     retry_delay = 3  # 秒
-                    success = False
+                    claimed = False
 
                     for attempt in range(max_retries):
                         try:
@@ -2925,12 +2969,13 @@ class OpinionSDKTrader:
                                 market_id=market_id)
 
                             if tx_hash:
-                                print(f"✓ 成功 (tx: {tx_hash[:16]}...)")
+                                console.print(
+                                    f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
                                 total_claimed += 1
                             else:
-                                print(f"✓ 成功")
+                                console.print(f"[green]✓ 成功[/green]")
                                 total_claimed += 1
-                            success = True
+                            claimed = True
                             break  # 成功则跳出重试循环
 
                         except Exception as e:
@@ -2938,48 +2983,48 @@ class OpinionSDKTrader:
                             if 'NoPositionsToRedeem' in error_msg or 'no positions' in error_msg.lower():
                                 print(f"⊘ 无可领取 (可能已领取)")
                                 total_skipped += 1
-                                success = True  # 标记为已处理
+                                claimed = True  # 标记为已处理
                                 break
                             elif attempt < max_retries - 1:
                                 # 还有重试机会
-                                print(f"✗ 失败，{retry_delay}秒后重试...")
+                                error(f"失败，{retry_delay}秒后重试...")
                                 if error_msg:
                                     print(f"    错误: {error_msg[:80]}")
                                 time.sleep(retry_delay)
                                 retry_delay *= 2  # 指数退避
                             else:
                                 # 最后一次重试也失败
-                                print(f"✗ 失败 (已重试{max_retries}次)")
+                                error(f"失败 (已重试{max_retries}次)")
                                 if error_msg:
                                     print(f"    错误: {error_msg[:80]}")
                                 total_failed += 1
 
                     # 延迟，避免请求过快
-                    if success:
+                    if claimed:
                         time.sleep(2)
 
             except Exception as e:
-                print(f"  ✗ 账户异常: {e}")
+                error(f"账户异常: {e}")
                 total_failed += 1
 
         # 汇总
-        print(f"\n{'='*60}")
+        console.print()
         print(f"Claim完成统计:")
-        print(f"  ✓ 成功: {total_claimed}")
+        success(f"成功: {total_claimed}")
         print(f"  ⊘ 跳过: {total_skipped}")
-        print(f"  ✗ 失败: {total_failed}")
-        print(f"{'='*60}")
+        error(f"失败: {total_failed}")
+        divider("═")
 
     def claim_specific_market(self):
         """指定市场ID进行Claim"""
-        market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+        market_id_input = ask("请输入市场ID")
         if not market_id_input:
             return
 
         try:
             market_id = int(market_id_input)
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         # 选择账户
@@ -2989,7 +3034,7 @@ class OpinionSDKTrader:
         print(f"  0. 所有账户")
         print(f"  留空返回")
 
-        account_choice = input(f"\n请选择 (0-{len(self.configs)}，留空返回): ").strip()
+        account_choice = ask(f"请选择账户 (0-{len(self.configs)})")
 
         if not account_choice:
             return
@@ -3001,18 +3046,18 @@ class OpinionSDKTrader:
             try:
                 idx = int(account_choice)
                 if idx < 1 or idx > len(self.clients):
-                    print("✗ 无效的账户选择")
+                    error("无效的账户选择")
                     return
                 selected_indices = [idx]
             except ValueError:
-                print("✗ 请输入有效的数字")
+                error("请输入有效的数字")
                 return
 
         # 确认
         print(f"\n将对 {len(selected_indices)} 个账户执行市场 {market_id} 的Claim")
-        confirm = input("确认请输入 'yes': ").strip().lower()
-        if confirm != 'yes':
-            print("✗ 已取消")
+        ok = confirm("确认执行此操作?")
+        if not ok:
+            error("已取消")
             return
 
         # 执行claim（带重试机制）
@@ -3039,9 +3084,10 @@ class OpinionSDKTrader:
                         market_id=market_id)
 
                     if tx_hash:
-                        print(f"✓ 成功 (tx: {tx_hash[:16]}...)")
+                        console.print(
+                            f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
                     else:
-                        print(f"✓ 成功")
+                        console.print(f"[green]✓ 成功[/green]")
                     success_count += 1
                     claimed = True
                     break  # 成功则跳出重试循环
@@ -3053,19 +3099,19 @@ class OpinionSDKTrader:
                         claimed = True  # 标记为已处理
                         break
                     elif 'non-resolved' in error_msg.lower():
-                        print(f"✗ 市场未结算")
+                        error("市场未结算")
                         fail_count += 1
                         break  # 市场未结算无需重试
                     elif attempt < max_retries - 1:
                         # 还有重试机会
-                        print(f"✗ 失败，{retry_delay}秒后重试...")
+                        error(f"失败，{retry_delay}秒后重试...")
                         if error_msg:
                             print(f"    错误: {error_msg[:80]}")
                         time.sleep(retry_delay)
                         retry_delay *= 2  # 指数退避
                     else:
                         # 最后一次重试也失败
-                        print(f"✗ 失败 (已重试{max_retries}次)")
+                        error(f"失败 (已重试{max_retries}次)")
                         if error_msg:
                             print(f"    错误: {error_msg[:80]}")
                         fail_count += 1
@@ -3073,9 +3119,9 @@ class OpinionSDKTrader:
             if claimed:
                 time.sleep(1)
 
-        print(f"\n{'='*60}")
+        console.print()
         print(f"Claim完成: 成功 {success_count}, 失败 {fail_count}")
-        print(f"{'='*60}")
+        divider("═")
 
     def execute_quick_mode_multi(self, market_id, token_id, selected_token_name, total_trades, min_amount, max_amount, selected_account_indices=None):
         """快速模式多账户版本：所有账户先买后卖
@@ -3087,10 +3133,10 @@ class OpinionSDKTrader:
         if selected_account_indices is None:
             selected_account_indices = list(range(1, len(self.clients) + 1))
 
-        print(f"\n{'='*60}")
+        console.print()
         print(f"快速模式 - 多账户串行执行")
         print(f"账户数量: {len(selected_account_indices)}")
-        print(f"{'='*60}")
+        divider("═")
 
         # total_trades表示交易次数，每次交易包含买入+卖出
         buy_count = total_trades   # 买入次数 = 交易次数
@@ -3101,9 +3147,9 @@ class OpinionSDKTrader:
         import threading
 
         # ============ 第一阶段：所有账户执行所有买入 ============
-        print(f"\n{'='*60}")
+        console.print()
         print(f"第一阶段：执行 {buy_count} 次买入")
-        print(f"{'='*60}")
+        divider("═")
 
         for buy_round in range(1, buy_count + 1):
             print(f"\n--- 第{buy_round}轮买入 ---")
@@ -3133,13 +3179,13 @@ class OpinionSDKTrader:
                     try:
                         ob_resp = client.get_orderbook(token_id=token_id)
                         if ob_resp.errno != 0:
-                            print(f"[{config.remark}] ✗ 无法获取盘口")
+                            error(f"[{config.remark}] 无法获取盘口")
                             return
 
                         asks = sorted(ob_resp.result.asks, key=lambda x: float(
                             x.price)) if ob_resp.result.asks else []
                         if not asks:
-                            print(f"[{config.remark}] ✗ 卖盘为空")
+                            error(f"[{config.remark}] 卖盘为空")
                             return
 
                         price = float(asks[0].price)
@@ -3160,20 +3206,20 @@ class OpinionSDKTrader:
                             print(
                                 f"[{config.remark}] ✓ 订单提交成功 @ {self.format_price(price)}¢")
                         elif resp.errno == 10207:
-                            print(f"[{config.remark}] ✗ 余额不足")
+                            error(f"[{config.remark}] 余额不足")
                         elif resp.errno == 10403:
-                            print(f"[{config.remark}] ✗ 地区限制")
+                            error(f"[{config.remark}] 地区限制")
                         else:
-                            print(f"[{config.remark}] ✗ 失败: errno={resp.errno}")
+                            error(f"[{config.remark}] 失败: errno={resp.errno}")
 
                     except Exception as e:
                         if "504" in str(e) or "Gateway Time-out" in str(e):
-                            print(f"[{config.remark}] [!]  网关超时，订单可能已提交")
+                            warning(f"[{config.remark}] 网关超时，订单可能已提交")
                         else:
-                            print(f"[{config.remark}] ✗ 异常: {e}")
+                            error(f"[{config.remark}] 异常: {e}")
 
                 except Exception as e:
-                    print(f"[{config.remark}] ✗ 买入异常: {e}")
+                    error(f"[{config.remark}] 买入异常: {e}")
 
             # 串行执行选中账户（稳定模式，避免触发限流）
             for i, acc_idx in enumerate(selected_account_indices):
@@ -3190,9 +3236,9 @@ class OpinionSDKTrader:
 
         # ============ 第二阶段：选中账户执行所有卖出 ============
         if sell_count > 0:
-            print(f"\n{'='*60}")
+            console.print()
             print(f"第二阶段：执行 {sell_count} 次卖出")
-            print(f"{'='*60}")
+            divider("═")
 
             for sell_round in range(1, sell_count + 1):
                 print(f"\n--- 第{sell_round}轮卖出 ---")
@@ -3213,7 +3259,7 @@ class OpinionSDKTrader:
                             pass
 
                         if current_position <= 0:
-                            print(f"[{config.remark}] [!]  无持仓")
+                            warning(f"[{config.remark}] 无持仓")
                             return
 
                         print(f"[{config.remark}] 卖出 {current_position} tokens")
@@ -3222,13 +3268,13 @@ class OpinionSDKTrader:
                         try:
                             ob_resp = client.get_orderbook(token_id=token_id)
                             if ob_resp.errno != 0:
-                                print(f"[{config.remark}] ✗ 无法获取盘口")
+                                error(f"[{config.remark}] 无法获取盘口")
                                 return
 
                             bids = sorted(ob_resp.result.bids, key=lambda x: float(
                                 x.price), reverse=True)
                             if not bids:
-                                print(f"[{config.remark}] ✗ 买盘为空")
+                                error(f"[{config.remark}] 买盘为空")
                                 return
 
                             price = float(bids[0].price)
@@ -3250,31 +3296,31 @@ class OpinionSDKTrader:
                                 print(
                                     f"[{config.remark}] ✓ 卖出成功 @ {self.format_price(price)}¢")
                             elif resp.errno == 10403:
-                                print(f"[{config.remark}] ✗ 地区限制")
+                                error(f"[{config.remark}] 地区限制")
                             else:
                                 print(
                                     f"[{config.remark}] ✗ 失败: errno={resp.errno}")
 
                         except Exception as e:
                             if "504" in str(e) or "Gateway Time-out" in str(e):
-                                print(f"[{config.remark}] [!]  网关超时，订单可能已提交")
+                                warning(f"[{config.remark}] 网关超时，订单可能已提交")
                             else:
-                                print(f"[{config.remark}] ✗ 异常: {e}")
+                                error(f"[{config.remark}] 异常: {e}")
 
                     except Exception as e:
                         error_str = str(e)
                         if "504" in error_str or "Gateway Time-out" in error_str:
-                            print(f"[{config.remark}] [!] 网关超时(504)，订单可能已提交")
+                            warning(f"[{config.remark}] 网关超时(504)，订单可能已提交")
                         elif "502" in error_str or "Bad Gateway" in error_str:
-                            print(f"[{config.remark}] [!] 网关错误(502)，请稍后重试")
+                            warning(f"[{config.remark}] 网关错误(502)，请稍后重试")
                         elif "503" in error_str or "Service Unavailable" in error_str:
-                            print(f"[{config.remark}] [!] 服务不可用(503)，请稍后重试")
+                            warning(f"[{config.remark}] 服务不可用(503)，请稍后重试")
                         elif "timeout" in error_str.lower() or "timed out" in error_str.lower():
-                            print(f"[{config.remark}] [!] 请求超时，请检查网络")
+                            warning(f"[{config.remark}] 请求超时，请检查网络")
                         elif "Connection" in error_str:
-                            print(f"[{config.remark}] [!] 连接失败，请检查代理")
+                            warning(f"[{config.remark}] 连接失败，请检查代理")
                         else:
-                            print(f"[{config.remark}] ✗ 卖出异常: {e}")
+                            error(f"[{config.remark}] 卖出异常: {e}")
 
                 # 串行执行选中账户（稳定模式，避免触发限流）
                 for i, acc_idx in enumerate(selected_account_indices):
@@ -3289,9 +3335,7 @@ class OpinionSDKTrader:
                 print(f"\n等待资金到账...")
                 time.sleep(3)
 
-        print(f"\n{'='*60}")
-        print(f"{'快速模式执行完成':^60}")
-        print(f"{'='*60}")
+        section("快速模式执行完成")
 
     def execute_low_loss_mode_multi(self, market_id, token_id, selected_token_name, total_trades, min_amount, max_amount, selected_account_indices=None):
         """低损耗模式多账户版本：所有账户先买后挂单
@@ -3303,10 +3347,10 @@ class OpinionSDKTrader:
         if selected_account_indices is None:
             selected_account_indices = list(range(1, len(self.clients) + 1))
 
-        print(f"\n{'='*60}")
+        console.print()
         print(f"低损耗模式 - 多账户串行执行")
         print(f"账户数量: {len(selected_account_indices)}")
-        print(f"{'='*60}")
+        divider("═")
 
         # total_trades表示交易次数，每次交易包含买入+卖出
         buy_count = total_trades   # 买入次数 = 交易次数
@@ -3317,9 +3361,9 @@ class OpinionSDKTrader:
         import threading
 
         # ============ 第一阶段：所有账户执行所有买入 ============
-        print(f"\n{'='*60}")
+        console.print()
         print(f"第一阶段：执行 {buy_count} 次买入")
-        print(f"{'='*60}")
+        divider("═")
 
         for buy_round in range(1, buy_count + 1):
             print(f"\n--- 第{buy_round}轮买入 ---")
@@ -3336,13 +3380,13 @@ class OpinionSDKTrader:
                     try:
                         ob_resp = client.get_orderbook(token_id=token_id)
                         if ob_resp.errno != 0:
-                            print(f"[{config.remark}] ✗ 无法获取盘口")
+                            error(f"[{config.remark}] 无法获取盘口")
                             return
 
                         asks = sorted(ob_resp.result.asks, key=lambda x: float(
                             x.price)) if ob_resp.result.asks else []
                         if not asks:
-                            print(f"[{config.remark}] ✗ 卖盘为空")
+                            error(f"[{config.remark}] 卖盘为空")
                             return
 
                         price = float(asks[0].price)
@@ -3363,20 +3407,20 @@ class OpinionSDKTrader:
                             print(
                                 f"[{config.remark}] ✓ 订单提交成功 @ {self.format_price(price)}¢")
                         elif resp.errno == 10207:
-                            print(f"[{config.remark}] ✗ 余额不足")
+                            error(f"[{config.remark}] 余额不足")
                         elif resp.errno == 10403:
-                            print(f"[{config.remark}] ✗ 地区限制")
+                            error(f"[{config.remark}] 地区限制")
                         else:
-                            print(f"[{config.remark}] ✗ 失败: errno={resp.errno}")
+                            error(f"[{config.remark}] 失败: errno={resp.errno}")
 
                     except Exception as e:
                         if "504" in str(e) or "Gateway Time-out" in str(e):
-                            print(f"[{config.remark}] [!]  网关超时，订单可能已提交")
+                            warning(f"[{config.remark}] 网关超时，订单可能已提交")
                         else:
-                            print(f"[{config.remark}] ✗ 异常: {e}")
+                            error(f"[{config.remark}] 异常: {e}")
 
                 except Exception as e:
-                    print(f"[{config.remark}] ✗ 买入异常: {e}")
+                    error(f"[{config.remark}] 买入异常: {e}")
 
             # 串行执行选中账户（稳定模式，避免触发限流）
             for i, acc_idx in enumerate(selected_account_indices):
@@ -3392,9 +3436,9 @@ class OpinionSDKTrader:
             time.sleep(5)
 
         # ============ 第二阶段：选中账户挂单卖出 ============
-        print(f"\n{'='*60}")
+        console.print()
         print(f"第二阶段：执行 {sell_count} 次挂单卖出")
-        print(f"{'='*60}")
+        divider("═")
 
         # 获取卖1-卖5价格供用户参考
         try:
@@ -3416,10 +3460,10 @@ class OpinionSDKTrader:
         print(f"  5. 卖5价格（最高）")
         print(f"  0. 自定义价格")
 
-        price_choice = input("\n请选择 (0-5): ").strip()
+        price_choice = ask("请选择 (0-5)")
 
         if price_choice == '0':
-            custom_price = float(input("请输入自定义价格（分，如99.5）: ").strip())
+            custom_price = ask_float("请输入自定义价格（分）")
             sell_price = custom_price / 100
         else:
             price_level = int(price_choice) if price_choice else 1
@@ -3429,7 +3473,7 @@ class OpinionSDKTrader:
                               key=lambda x: float(x.price))
                 sell_price = float(asks[price_level - 1].price)
             except Exception:
-                print("✗ 获取价格失败")
+                error("获取价格失败")
                 return
 
         print(f"\n挂单价格: {self.format_price(sell_price)}¢")
@@ -3453,7 +3497,7 @@ class OpinionSDKTrader:
                         pass
 
                     if current_position <= 0:
-                        print(f"[{config.remark}] [!]  无持仓")
+                        warning(f"[{config.remark}] 无持仓")
                         return
 
                     print(f"[{config.remark}] 挂卖 {current_position} tokens")
@@ -3472,20 +3516,20 @@ class OpinionSDKTrader:
                         resp = client.place_order(order, check_approval=True)
 
                         if resp.errno == 0:
-                            print(f"[{config.remark}] ✓ 挂单成功")
+                            success(f"[{config.remark}] 挂单成功")
                         elif resp.errno == 10403:
-                            print(f"[{config.remark}] ✗ 地区限制")
+                            error(f"[{config.remark}] 地区限制")
                         else:
-                            print(f"[{config.remark}] ✗ 失败: errno={resp.errno}")
+                            error(f"[{config.remark}] 失败: errno={resp.errno}")
 
                     except Exception as e:
                         if "504" in str(e) or "Gateway Time-out" in str(e):
-                            print(f"[{config.remark}] [!]  网关超时，订单可能已提交")
+                            warning(f"[{config.remark}] 网关超时，订单可能已提交")
                         else:
-                            print(f"[{config.remark}] ✗ 异常: {e}")
+                            error(f"[{config.remark}] 异常: {e}")
 
                 except Exception as e:
-                    print(f"[{config.remark}] ✗ 挂单异常: {e}")
+                    error(f"[{config.remark}] 挂单异常: {e}")
 
             # 串行执行选中账户（稳定模式，避免触发限流）
             for i, acc_idx in enumerate(selected_account_indices):
@@ -3498,9 +3542,7 @@ class OpinionSDKTrader:
 
             time.sleep(2)
 
-        print(f"\n{'='*60}")
-        print(f"{'低损耗模式执行完成':^60}")
-        print(f"{'='*60}")
+        section("低损耗模式执行完成")
 
     def run_trading_session(self):
         """运行交易会话"""
@@ -3511,55 +3553,43 @@ class OpinionSDKTrader:
         # 默认直连模式
 
         # 现在初始化所有客户端
-        print(f"\n{'='*60}")
-        print(f"{'初始化账户客户端':^60}")
-        print(f"{'='*60}")
+        section("初始化账户")
         self._init_all_clients()
-        print(f"\n✓ 已初始化 {len(self.clients)} 个账户")
-        print(f"✓ 市场列表服务已启动（后台自动刷新）")
+        success(f"已初始化 {len(self.clients)} 个账户")
+        success("市场列表服务已启动（后台自动刷新）")
 
         # ============ 主菜单 ============
         while True:
-            print(f"\n{'='*60}")
-            print(f"{'主菜单':^60}")
-            print(f"{'='*60}")
-            print("  1. 开始交易")
-            print("  2. 合并/拆分")
-            print("  3. 查询挂单")
-            print("  4. 撤销挂单")
-            print("  5. 查询TOKEN持仓")
-            print("  6. 查询账户资产详情")
-            print("  7. Claim (领取已结算市场收益)")
-            print("  0. 退出程序")
+            section("主菜单")
+            choice = select("请选择操作:", [
+                ("🔀 合并/拆分", "merge"),
+                ("📈 开始交易", "trade"),
+                ("📋 查询挂单", "orders"),
+                ("❌ 撤销挂单", "cancel"),
+                ("💰 查询TOKEN持仓", "position"),
+                ("💳 查询账户资产", "assets"),
+                ("🎁 Claim (领取收益)", "claim"),
+            ], back_text="退出程序")
 
-            menu_choice = input("\n请选择 (0-7): ").strip()
-
-            if menu_choice == '0':
-                print("\n✓ 程序退出")
+            if choice is None:
+                success("程序退出")
                 return
-            elif menu_choice == '1':
-                # 开始交易
+            elif choice == 'trade':
                 self.trading_menu()
-            elif menu_choice == '2':
-                # 合并/拆分
+            elif choice == 'merge':
                 self.merge_split_menu()
-            elif menu_choice == '3':
-                # 查询挂单
+            elif choice == 'orders':
                 self.query_open_orders()
-            elif menu_choice == '4':
-                # 撤销挂单
+            elif choice == 'cancel':
                 self.cancel_orders_menu()
-            elif menu_choice == '5':
-                # 查询TOKEN持仓
+            elif choice == 'position':
                 self.query_positions()
-            elif menu_choice == '6':
-                # 查询账户资产详情
+            elif choice == 'assets':
                 self.query_account_assets()
-            elif menu_choice == '7':
-                # Claim领取收益
+            elif choice == 'claim':
                 self.claim_menu()
             else:
-                print("✗ 无效选择")
+                error("无效选择")
 
     def parse_custom_strategy(self, strategy_str: str) -> list:
         """
@@ -3644,9 +3674,7 @@ class OpinionSDKTrader:
 
     def limit_order_menu(self, selected_account_indices: list):
         """挂单模式菜单 - 自定义价格挂单买入或卖出"""
-        print(f"\n{'='*60}")
-        print(f"{'挂单模式（自定义价格）':^60}")
-        print(f"{'='*60}")
+        section("挂单模式（自定义价格）")
 
         # 1. 选择挂单方向
         print("\n挂单方向:")
@@ -3654,31 +3682,31 @@ class OpinionSDKTrader:
         print("  2. 挂单卖出")
         print("  3. 挂单买入 → 成交后自动卖1挂出")
         print("  0. 返回")
-        direction_choice = input("请选择 (0-3): ").strip()
+        direction_choice = ask("请选择 (0-3)")
 
         if direction_choice == '0' or not direction_choice:
             return
         elif direction_choice not in ['1', '2', '3']:
-            print("✗ 无效选择")
+            error("无效选择")
             return
 
         is_buy = (direction_choice in ['1', '3'])
         auto_sell_after_buy = (direction_choice == '3')
         direction_name = "买入" if is_buy else "卖出"
         if auto_sell_after_buy:
-            print(f"\n✓ 已选择: 挂单买入 → 成交后自动卖1挂出")
+            success(f"已选择: 挂单买入 → 成交后自动卖1挂出")
         else:
-            print(f"\n✓ 已选择: 挂单{direction_name}")
+            success(f"已选择: 挂单{direction_name}")
 
         # 2. 输入市场ID
-        market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+        market_id_input = ask("请输入市场ID")
         if not market_id_input:
             return
 
         try:
             market_id = int(market_id_input)
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         # 3. 获取市场信息
@@ -3693,11 +3721,11 @@ class OpinionSDKTrader:
             if categorical_response.errno == 0 and categorical_response.result and categorical_response.result.data:
                 market_data = categorical_response.result.data
                 if not hasattr(market_data, 'market_title') or not market_data.market_title:
-                    print(f"✗ 市场 {market_id} 数据不完整")
+                    error(f"市场 {market_id} 数据不完整")
                     return
 
                 parent_market_title = market_data.market_title
-                print(f"\n✓ 找到分类市场: {parent_market_title}")
+                success(f"找到分类市场: {parent_market_title}")
 
                 if hasattr(market_data, 'child_markets') and market_data.child_markets and len(market_data.child_markets) > 0:
                     child_markets = market_data.child_markets
@@ -3711,19 +3739,18 @@ class OpinionSDKTrader:
                         print(f"  {idx}. [{child_id}] {title}")
                     print(f"  0. 返回")
 
-                    choice_input = input(
-                        f"\n请选择子市场 (0-{len(child_markets)}): ").strip()
+                    choice_input = ask(f"\n请选择子市场 (0-{len(child_markets)}): ")
                     if not choice_input or choice_input == '0':
                         return
 
                     try:
                         choice = int(choice_input)
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                         return
 
                     if choice < 1 or choice > len(child_markets):
-                        print("✗ 无效的选择")
+                        error("无效的选择")
                         return
 
                     selected_child = child_markets[choice - 1]
@@ -3731,7 +3758,7 @@ class OpinionSDKTrader:
 
                     detail_response = client.get_market(market_id=market_id)
                     if detail_response.errno != 0 or not detail_response.result or not detail_response.result.data:
-                        print(f"✗ 获取子市场详细信息失败")
+                        error(f"获取子市场详细信息失败")
                         return
 
                     market_data = detail_response.result.data
@@ -3741,14 +3768,14 @@ class OpinionSDKTrader:
                 market_response = client.get_market(market_id=market_id)
 
                 if market_response.errno != 0 or not market_response.result or not market_response.result.data:
-                    print(f"✗ 市场 {market_id} 不存在")
+                    error(f"市场 {market_id} 不存在")
                     return
 
                 market_data = market_response.result.data
-                print(f"\n✓ 找到二元市场: {market_data.market_title}")
+                success(f"找到二元市场: {market_data.market_title}")
 
         except Exception as e:
-            print(f"✗ 获取市场信息失败: {e}")
+            error(f"获取市场信息失败: {e}")
             return
 
         # 4. 选择交易方向
@@ -3756,7 +3783,7 @@ class OpinionSDKTrader:
         print(f"  1. YES")
         print(f"  2. NO")
         print(f"  0. 返回")
-        side_choice = input("请输入选项 (0-2): ").strip()
+        side_choice = ask("请选择 (0-2)")
 
         if side_choice == '0' or not side_choice:
             return
@@ -3767,10 +3794,10 @@ class OpinionSDKTrader:
             token_id = market_data.no_token_id
             selected_token_name = "NO"
         else:
-            print("✗ 无效选择")
+            error("无效选择")
             return
 
-        print(f"\n✓ 已选择: {selected_token_name}")
+        success(f"已选择: {selected_token_name}")
 
         # 4.5 对于"挂单买入成交后卖1挂出"模式，检测是否有未挂出的持仓
         if auto_sell_after_buy:
@@ -3838,25 +3865,25 @@ class OpinionSDKTrader:
                 print(f"\n检测到可挂出份额: {total_available}份")
                 print(f"  1. 直接挂出这些份额（以买1价格）")
                 print(f"  2. 继续新的挂单买入流程")
-                resume_choice = input("请选择 (1-2): ").strip()
+                resume_choice = ask("请选择 (1-2)")
 
                 if resume_choice == '1':
                     # 直接挂出模式
                     while True:
-                        split_input = input("\n请输入要分几笔挂出: ").strip()
+                        split_input = ask("请输入要分几笔挂出: ")
                         try:
                             split_count = int(split_input)
                             if split_count <= 0:
-                                print("✗ 笔数必须大于0")
+                                error("笔数必须大于0")
                                 continue
                             break
                         except ValueError:
-                            print("✗ 请输入有效的整数")
+                            error("请输入有效的整数")
 
                     # 获取买1价格
                     ob = OrderbookService.fetch(client, token_id)
                     if not ob['success'] or not ob['bids']:
-                        print("✗ 无买盘，无法挂卖")
+                        error("无买盘，无法挂卖")
                         return
                     sell_price = ob['bid1_price']
                     print(f"\n买1价格: {self.format_price(sell_price)}¢")
@@ -3874,16 +3901,14 @@ class OpinionSDKTrader:
                                 f"  [!] [{config.remark}] 买1价格 {self.format_price(sell_price)}¢ 低于成本价 {self.format_price(cost_price)}¢ (亏损 {loss_pct:.1f}%)")
 
                     if has_loss_risk:
-                        print(f"\n[!] 警告: 当前买1价格低于部分账户成本价，继续挂单可能存在亏损!")
-                        loss_confirm = input("输入 1 继续挂单，其他或回车返回主菜单: ").strip()
+                        warning(f"警告: 当前买1价格低于部分账户成本价，继续挂单可能存在亏损!")
+                        loss_confirm = "1" if confirm("继续挂单?") else ""
                         if loss_confirm != '1':
-                            print("✗ 已取消")
+                            error("已取消")
                             return
 
                     # 确认信息
-                    print(f"\n{'='*60}")
-                    print(f"{'【挂卖确认】':^60}")
-                    print(f"{'='*60}")
+                    section("【挂卖确认】")
                     print(f"  市场: {market_data.market_title}")
                     print(f"  方向: {selected_token_name}")
                     print(f"  操作: 挂出之前买入成交的份额")
@@ -3891,11 +3916,11 @@ class OpinionSDKTrader:
                     print(f"  总份额: {total_available}份")
                     print(f"  分笔数: {split_count}")
                     print(f"  账户数: {len(selected_account_indices)}")
-                    print(f"{'='*60}")
+                    divider("═")
 
-                    confirm = input("\n确认无误请输入 'done': ").strip().lower()
+                    confirm = ask("确认无误请输入 'done': ").lower()
                     if confirm != 'done':
-                        print("✗ 已取消")
+                        error("已取消")
                         return
 
                     # 执行挂卖
@@ -3939,7 +3964,7 @@ class OpinionSDKTrader:
                     print(
                         f"  [*] 挂单提示: 高于卖1价格 {self.format_price(ob['ask1_price'])}¢ 需等待成交")
         else:
-            print(f"[!] 获取盘口失败，继续...")
+            warning(f"获取盘口失败，继续...")
 
         # 6. 输入挂单价格（支持固定价格或区间随机）
         print(f"\n请输入挂单价格 (单位: 分，如 50 表示 50¢)")
@@ -3950,7 +3975,7 @@ class OpinionSDKTrader:
         price_range = None  # 价格区间 (min, max)
 
         while True:
-            price_input = input("挂单价格 (留空返回): ").strip()
+            price_input = ask("挂单价格")
             if not price_input:
                 return
 
@@ -3959,15 +3984,15 @@ class OpinionSDKTrader:
                     # 区间模式
                     parts = price_input.split('-')
                     if len(parts) != 2:
-                        print("✗ 区间格式错误，请使用 最低-最高 格式，如 48-52")
+                        error("区间格式错误，请使用 最低-最高 格式，如 48-52")
                         continue
                     min_price = float(parts[0].strip())
                     max_price = float(parts[1].strip())
                     if min_price <= 0 or max_price >= 100:
-                        print("✗ 价格必须在 0-100 之间")
+                        error("价格必须在 0-100 之间")
                         continue
                     if min_price > max_price:
-                        print("✗ 最低价格不能大于最高价格")
+                        error("最低价格不能大于最高价格")
                         continue
                     price_range = (min_price / 100, max_price / 100)  # 转换为小数
                     print(
@@ -3977,54 +4002,54 @@ class OpinionSDKTrader:
                     # 固定价格模式
                     price_cent = float(price_input)
                     if price_cent <= 0 or price_cent >= 100:
-                        print("✗ 价格必须在 0-100 之间")
+                        error("价格必须在 0-100 之间")
                         continue
                     order_price = price_cent / 100  # 转换为小数
-                    print(f"✓ 挂单价格: {self.format_price(order_price)}¢")
+                    success(f"挂单价格: {self.format_price(order_price)}¢")
                     break
             except ValueError:
-                print("✗ 请输入有效的数字")
+                error("请输入有效的数字")
 
         # 7. 输入挂单次数
         while True:
-            num_input = input("\n请输入挂单次数: ").strip()
+            num_input = ask("请输入挂单次数")
             try:
                 num_orders = int(num_input)
                 if num_orders <= 0:
-                    print("✗ 次数必须大于0")
+                    error("次数必须大于0")
                     continue
                 break
             except ValueError:
-                print("✗ 请输入有效的整数")
+                error("请输入有效的整数")
 
-        print(f"✓ 挂单次数: {num_orders}")
+        success(f"挂单次数: {num_orders}")
 
         # 8. 输入金额范围（买入）或份额范围（卖出）
         if is_buy:
             print(f"\n请输入单笔金额范围 (USDT):")
             while True:
-                min_input = input("单笔最低金额 ($): ").strip()
+                min_input = ask("单笔最低金额 ($)")
                 try:
                     min_amount = float(min_input)
                     if min_amount <= 0:
-                        print("✗ 金额必须大于0")
+                        error("金额必须大于0")
                         continue
                     break
                 except ValueError:
-                    print("✗ 请输入有效的数字")
+                    error("请输入有效的数字")
 
             while True:
-                max_input = input("单笔最高金额 ($): ").strip()
+                max_input = ask("单笔最高金额 ($)")
                 try:
                     max_amount = float(max_input)
                     if max_amount < min_amount:
-                        print(f"✗ 最高金额必须 >= 最低金额 ${min_amount:.2f}")
+                        error(f"最高金额必须 >= 最低金额 ${min_amount:.2f}")
                         continue
                     break
                 except ValueError:
-                    print("✗ 请输入有效的数字")
+                    error("请输入有效的数字")
 
-            print(f"✓ 单笔金额: ${min_amount:.2f} - ${max_amount:.2f}")
+            success(f"单笔金额: ${min_amount:.2f} - ${max_amount:.2f}")
         else:
             # 卖出模式：查询持仓
             print(f"\n正在查询持仓...")
@@ -4054,52 +4079,50 @@ class OpinionSDKTrader:
 
             total_position = sum(account_positions.values())
             if total_position == 0:
-                print(f"\n✗ 所有账户均无持仓，无法挂单卖出")
+                error(f"所有账户均无持仓，无法挂单卖出")
                 return
 
             # 先询问是否全仓挂出
             print(f"\n是否全仓挂出?")
             print(f"  1. 是 - 全仓挂出")
             print(f"  2. 否 - 自定义份额")
-            full_sell_choice = input("请选择 (1-2): ").strip()
+            full_sell_choice = ask("请选择 (1-2)")
 
             if full_sell_choice == '1':
                 # 全仓挂出：每个账户的份额就是其持仓量
                 # min_amount和max_amount设为0，表示全仓模式
                 min_amount = 0
                 max_amount = 0
-                print(f"✓ 已选择: 全仓挂出")
+                success(f"已选择: 全仓挂出")
             else:
                 # 自定义份额
                 print(f"\n请输入单笔份额范围:")
                 while True:
-                    min_input = input("单笔最低份额: ").strip()
+                    min_input = ask("单笔最低份额")
                     try:
                         min_amount = int(min_input)
                         if min_amount <= 0:
-                            print("✗ 份额必须大于0")
+                            error("份额必须大于0")
                             continue
                         break
                     except ValueError:
-                        print("✗ 请输入有效的整数")
+                        error("请输入有效的整数")
 
                 while True:
-                    max_input = input("单笔最高份额: ").strip()
+                    max_input = ask("单笔最高份额")
                     try:
                         max_amount = int(max_input)
                         if max_amount < min_amount:
-                            print(f"✗ 最高份额必须 >= 最低份额 {min_amount}")
+                            error(f"最高份额必须 >= 最低份额 {min_amount}")
                             continue
                         break
                     except ValueError:
-                        print("✗ 请输入有效的整数")
+                        error("请输入有效的整数")
 
-                print(f"✓ 单笔份额: {min_amount} - {max_amount}")
+                success(f"单笔份额: {min_amount} - {max_amount}")
 
         # 9. 确认信息
-        print(f"\n{'='*60}")
-        print(f"{'【挂单确认】':^60}")
-        print(f"{'='*60}")
+        section("【挂单确认】")
         print(f"  市场: {market_data.market_title}")
         print(f"  方向: {selected_token_name}")
         if auto_sell_after_buy:
@@ -4127,11 +4150,11 @@ class OpinionSDKTrader:
                 print(
                     f"  预计总份额: {min_amount * num_orders} - {max_amount * num_orders}")
         print(f"  账户数: {len(selected_account_indices)}")
-        print(f"{'='*60}")
+        divider("═")
 
-        confirm = input("\n确认无误请输入 'done': ").strip().lower()
+        confirm = ask("确认无误请输入 'done': ").lower()
         if confirm != 'done':
-            print("✗ 已取消")
+            error("已取消")
             return
 
         # 10. 执行挂单
@@ -4159,12 +4182,12 @@ class OpinionSDKTrader:
         """
         import threading
 
-        print(f"\n{'='*60}")
+        console.print()
         if auto_sell_after_buy:
             print(f"开始执行挂单买入 → 成交后自动卖1挂出")
         else:
             print(f"开始执行挂单{'买入' if is_buy else '卖出'}")
-        print(f"{'='*60}")
+        divider("═")
 
         # 价格处理：支持固定价格或区间随机
         def get_order_price():
@@ -4419,7 +4442,7 @@ class OpinionSDKTrader:
 
                 except Exception as e:
                     with print_lock:
-                        print(f"  [{config.remark}] ✗ 挂单#{i}异常: {e}")
+                        error(f"[{config.remark}] 挂单#{i}异常: {e}")
                     fail_count += 1
 
             with print_lock:
@@ -4433,22 +4456,16 @@ class OpinionSDKTrader:
             if i < len(selected_account_indices) - 1:
                 time.sleep(random.uniform(1, 2))
 
-        print(f"\n{'='*60}")
-        print(f"{'挂单执行完成':^60}")
-        print(f"{'='*60}")
+        section("挂单执行完成")
 
     # ============ 做市商策略相关方法 ============
 
     def market_maker_menu(self, selected_account_indices: list):
         """做市商模式入口菜单"""
-        print(f"\n{'='*60}")
-        print(f"{'做市商模式':^60}")
-        print(f"{'='*60}")
+        section("做市商模式")
 
         # ===== 风险提示 =====
-        print(f"\n{'='*60}")
-        print(f"{'[!] 风险提示':^60}")
-        print(f"{'='*60}")
+        section("[!] 风险提示")
         print("做市交易风险巨大，可能会出现巨大亏损！")
         print("可能的风险包括但不限于：")
         print("  - 价格剧烈波动导致单边持仓亏损")
@@ -4456,14 +4473,14 @@ class OpinionSDKTrader:
         print("  - 市场流动性枯竭无法平仓")
         print("  - 网络延迟导致撤单不及时")
         print("一切亏损责任需要操作者自行承担，与软件作者无关。")
-        print(f"{'='*60}")
+        divider("═")
 
         print("\n说明: 双边挂单策略，同时在买卖两侧挂单")
         print("      支持分层挂单（如买1-5-10分布），增加订单簿厚度")
         print("      支持垂直/金字塔/倒金字塔分布模式")
         print("      支持价格跟随、仓位管理、止损保护")
 
-        risk_confirm = input("\n确认了解风险并继续？输入 yes 继续，其他按键返回: ").strip().lower()
+        risk_confirm = ask("确认了解风险并继续？输入 yes 继续，其他按键返回: ").lower()
         if risk_confirm != 'yes':
             print("已返回主菜单")
             return
@@ -4473,20 +4490,20 @@ class OpinionSDKTrader:
         print("  1. 单市场做市")
         print("  2. 批量多市场做市（多市场+多账户矩阵分配）")
 
-        mode_choice = input("请选择 (1/2, 默认1): ").strip()
+        mode_choice = ask("请选择 (1/2)", default="1")
         if mode_choice == '2':
             self._batch_market_maker_menu(selected_account_indices)
             return
 
         # 1. 输入市场ID
-        market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+        market_id_input = ask("请输入市场ID")
         if not market_id_input:
             return
 
         try:
             market_id = int(market_id_input)
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         # 2. 获取市场信息
@@ -4503,11 +4520,11 @@ class OpinionSDKTrader:
                 # 这是一个分类市场
                 market_data = categorical_response.result.data
                 if not hasattr(market_data, 'market_title') or not market_data.market_title:
-                    print(f"✗ 市场 {market_id} 数据不完整")
+                    error(f"市场 {market_id} 数据不完整")
                     return
 
                 parent_market_title = market_data.market_title
-                print(f"\n✓ 找到分类市场: {parent_market_title}")
+                success(f"找到分类市场: {parent_market_title}")
 
                 # 显示子市场列表
                 if hasattr(market_data, 'child_markets') and market_data.child_markets:
@@ -4520,41 +4537,40 @@ class OpinionSDKTrader:
                             child, 'market_id') else 0
                         print(f"  {i}. {child_title} (ID: {child_id})")
 
-                    child_choice = input(
-                        f"\n请选择子市场 (1-{len(child_markets)}): ").strip()
+                    child_choice = ask(f"\n请选择子市场 (1-{len(child_markets)}): ")
                     try:
                         child_idx = int(child_choice) - 1
                         if 0 <= child_idx < len(child_markets):
                             selected_child = child_markets[child_idx]
                             market_id = selected_child.market_id
-                            print(f"✓ 已选择: {selected_child.market_title}")
+                            success(f"已选择: {selected_child.market_title}")
                             # 获取子市场详细信息（包含token_id）
                             child_response = client.get_market(
                                 market_id=market_id)
                             if child_response.errno != 0 or not child_response.result or not child_response.result.data:
-                                print(f"✗ 无法获取子市场详细信息")
+                                error(f"无法获取子市场详细信息")
                                 return
                             market_data = child_response.result.data
                         else:
-                            print("✗ 选择无效")
+                            error("选择无效")
                             return
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                         return
                 else:
-                    print("✗ 该分类市场没有子市场")
+                    error("该分类市场没有子市场")
                     return
             else:
                 # 尝试作为普通市场获取
                 market_response = client.get_market(market_id=market_id)
                 if market_response.errno != 0:
-                    print(f"✗ 市场不存在或已下架，请检查市场ID ({market_response.errmsg})")
+                    error(f"市场不存在或已下架，请检查市场ID ({market_response.errmsg})")
                     return
                 market_data = market_response.result.data
-                print(f"\n✓ 找到市场: {market_data.market_title}")
+                success(f"找到市场: {market_data.market_title}")
 
         except Exception as e:
-            print(f"✗ 获取市场信息异常: {e}")
+            error(f"获取市场信息异常: {e}")
             return
 
         # 3. 选择YES/NO方向
@@ -4562,7 +4578,7 @@ class OpinionSDKTrader:
         print("  1. YES")
         print("  2. NO")
 
-        side_choice = input("请选择 (1/2): ").strip()
+        side_choice = ask("请选择 (1/2)")
         if side_choice == '1':
             token_id = market_data.yes_token_id if hasattr(
                 market_data, 'yes_token_id') else None
@@ -4572,14 +4588,14 @@ class OpinionSDKTrader:
                 market_data, 'no_token_id') else None
             selected_token_name = "NO"
         else:
-            print("✗ 无效选择")
+            error("无效选择")
             return
 
         if not token_id:
-            print("✗ 无法获取Token ID")
+            error("无法获取Token ID")
             return
 
-        print(f"✓ 已选择: {selected_token_name} (Token: {token_id})")
+        success(f"已选择: {selected_token_name} (Token: {token_id})")
 
         # 4. 显示当前盘口并获取价格
         current_bid1, current_ask1 = self._mm_show_orderbook(client, token_id)
@@ -4596,9 +4612,9 @@ class OpinionSDKTrader:
         # 6. 显示配置确认
         self._mm_show_config(config, selected_account_indices)
 
-        confirm = input("\n确认开始做市？输入 'start' 启动: ").strip().lower()
+        confirm = ask("确认开始做市？输入 'start' 启动: ").lower()
         if confirm != 'start':
-            print("✗ 已取消")
+            error("已取消")
             return
 
         # 7. 检查现有持仓并询问是否挂卖单（在选择运行模式之前完成所有input）
@@ -4624,7 +4640,7 @@ class OpinionSDKTrader:
                 print(
                     f"  [{pos['remark']}] {pos['shares']}份 @ {self.format_price(pos['price'])}¢ (价值${pos['value']:.2f})")
 
-            sell_choice = input("\n是否将现有持仓挂卖单? (y/n, 默认y): ").strip().lower()
+            sell_choice = ask("是否将现有持仓挂卖单? (y/n, 默认y): ").lower()
             if sell_choice != 'n':
                 # 获取当前卖1价作为参考
                 client = self.clients[selected_account_indices[0] - 1]
@@ -4633,8 +4649,8 @@ class OpinionSDKTrader:
                     ask1_price = float(orderbook.asks[0].price)
                     print(f"\n当前卖1价: {self.format_price(ask1_price)}¢")
 
-                    price_input = input(
-                        f"挂单价格 (默认卖1价 {self.format_price(ask1_price)}¢): ").strip()
+                    price_input = ask(
+                        f"挂单价格 (默认卖1价 {self.format_price(ask1_price)}¢): ")
                     if price_input:
                         sell_price = float(price_input) / 100  # 输入是分，转为美元
                     else:
@@ -4646,9 +4662,9 @@ class OpinionSDKTrader:
                             'shares': pos['shares'],
                             'price': sell_price
                         }
-                    print(f"✓ 将在做市启动后以 {self.format_price(sell_price)}¢ 挂卖单")
+                    success(f"将在做市启动后以 {self.format_price(sell_price)}¢ 挂卖单")
                 else:
-                    print("✗ 无法获取当前盘口，跳过挂卖单")
+                    error("无法获取当前盘口，跳过挂卖单")
 
         # 保存初始卖单配置
         config.initial_sell_orders = initial_sell_orders
@@ -4657,13 +4673,13 @@ class OpinionSDKTrader:
         print("\n[运行模式]")
         print("  1. 前台运行（关闭终端后停止）")
         print("  2. 后台运行（守护进程，关闭终端后继续运行）")
-        mode_choice = input("请选择 (1/2, 默认1): ").strip()
+        mode_choice = ask("请选择 (1/2)", default="1")
 
         if mode_choice == '2':
             # 检查是否已有守护进程
             running, pid = DaemonProcess.is_running()
             if running:
-                print(f"\n✗ 已有守护进程在运行 (PID: {pid})")
+                error(f"已有守护进程在运行 (PID: {pid})")
                 print(f"  使用 'python trade.py stop' 停止")
                 return
 
@@ -4679,9 +4695,9 @@ class OpinionSDKTrader:
     def _configure_market_maker(self, market_id: int, token_id: str, market_title: str = "",
                                 current_bid1: float = 0, current_ask1: float = 0):
         """交互式配置做市参数"""
-        print(f"\n{'─'*40}")
+        divider(width=40)
         print("做市商参数配置")
-        print(f"{'─'*40}")
+        divider()
 
         # 计算当前中间价供参考
         mid_price = (current_bid1 + current_ask1) / \
@@ -4699,30 +4715,30 @@ class OpinionSDKTrader:
 
         max_shares = max_amount = max_percent = 0
         while True:
-            limit_choice = input("请选择 (1-3): ").strip()
+            limit_choice = ask("请选择 (1-3)")
             if limit_choice == '1':
-                shares_input = input("最大持仓份额: ").strip()
+                shares_input = ask("最大持仓份额")
                 if shares_input:
                     max_shares = int(shares_input)
                     if max_shares > 0:
                         break
-                print("  [!] 请输入有效的份额限制")
+                warning("请输入有效的份额限制")
             elif limit_choice == '2':
-                amount_input = input("最大持仓金额（美元）: ").strip()
+                amount_input = ask("最大持仓金额 (美元)")
                 if amount_input:
                     max_amount = float(amount_input)
                     if max_amount > 0:
                         break
-                print("  [!] 请输入有效的金额限制")
+                warning("请输入有效的金额限制")
             elif limit_choice == '3':
-                percent_input = input("最大仓位百分比（如10表示10%）: ").strip()
+                percent_input = ask("最大仓位百分比 (%)")
                 if percent_input:
                     max_percent = float(percent_input)
                     if max_percent > 0:
                         break
-                print("  [!] 请输入有效的百分比限制")
+                warning("请输入有效的百分比限制")
             else:
-                print("  [!] 请选择1、2或3")
+                warning("请选择1、2或3")
 
         # ============ 价格边界保护（防止被带节奏）============
         print("\n[价格边界保护] 防止被恶意带节奏")
@@ -4731,39 +4747,37 @@ class OpinionSDKTrader:
         # 买入价格上限 (mid_price 是原始小数价格，如0.7455)
         if mid_price:
             suggested_max_buy = int((mid_price + 0.10) * 100)  # 建议：中间价+10分，取整
-            max_buy_input = input(
-                f"买入价格上限（分，建议{suggested_max_buy}，留空不限）: ").strip()
+            max_buy_input = ask(f"买入价格上限（分，建议{suggested_max_buy}，留空不限）: ")
         else:
-            max_buy_input = input("买入价格上限（分，留空不限）: ").strip()
+            max_buy_input = ask("买入价格上限 (留空不限)")
         max_buy_price = float(max_buy_input) / \
             100 if max_buy_input else 0  # 转换为小数
 
         # 卖出价格下限
         if mid_price:
             suggested_min_sell = int((mid_price - 0.10) * 100)  # 建议：中间价-10分，取整
-            min_sell_input = input(
-                f"卖出价格下限（分，建议{suggested_min_sell}，留空不限）: ").strip()
+            min_sell_input = ask(f"卖出价格下限（分，建议{suggested_min_sell}，留空不限）: ")
         else:
-            min_sell_input = input("卖出价格下限（分，留空不限）: ").strip()
+            min_sell_input = ask("卖出价格下限 (留空不限)")
         min_sell_price = float(min_sell_input) / \
             100 if min_sell_input else 0  # 转换为小数
 
         # 最大偏离度
         print("\n  偏离度保护: 相对于启动时中间价的最大偏离")
-        deviation_input = input("最大价格偏离（分，如5表示±5分，留空不限）: ").strip()
+        deviation_input = ask("最大价格偏离 (±分, 留空不限)")
         max_deviation = float(deviation_input) / \
             100 if deviation_input else 0  # 转换为小数
 
         # ============ 盘口深度验证 ============
         print("\n[盘口深度验证] 防止薄盘操控")
         print("  深度不足时将暂停挂单，等待深度恢复")
-        depth_input = input("最小盘口深度（美元，建议100-1000，留空不限）: ").strip()
+        depth_input = ask("最小盘口深度 ($, 留空不限)")
         min_depth = float(depth_input) if depth_input else 0
 
         # ============ 深度骤降保护 ============
         print("\n[深度骤降保护] 检测大量撤单时自动撤单")
         print("  当盘口深度在短时间内骤降时触发保护")
-        depth_drop_enable = input("启用深度骤降保护？(y/n, 默认y): ").strip().lower()
+        depth_drop_enable = "y" if confirm("启用深度骤降保护") else "n"
         auto_cancel_on_depth_drop = depth_drop_enable != 'n'
 
         depth_drop_threshold = 50.0  # 默认50%
@@ -4772,11 +4786,11 @@ class OpinionSDKTrader:
         emergency_sell_percent = 0
 
         if auto_cancel_on_depth_drop:
-            threshold_input = input("深度骤降阈值（百分比，默认50，即下降50%触发）: ").strip()
+            threshold_input = ask("深度骤降阈值 (%)", default="50")
             depth_drop_threshold = float(
                 threshold_input) if threshold_input else 50.0
 
-            window_input = input("检测窗口（检查次数，默认3）: ").strip()
+            window_input = ask("检测窗口 (次数)", default="3")
             depth_drop_window = int(window_input) if window_input else 3
 
             # 紧急撤单时持仓处理方式
@@ -4784,13 +4798,13 @@ class OpinionSDKTrader:
             print("    1. 只撤单，保留全部持仓（默认）")
             print("    2. 撤单后，市价卖出全部持仓")
             print("    3. 撤单后，市价卖出部分持仓，保留一定比例")
-            position_action_choice = input("  请选择 (1-3, 默认1): ").strip() or '1'
+            position_action_choice = ask("  请选择 (1-3, 默认1)", default="1")
 
             if position_action_choice == '2':
                 print("\n  ⚠️  警告：市价卖出可能存在较大滑点！")
                 print("     在盘口深度不足或剧烈波动时，实际成交价可能远低于预期。")
                 print("  💡 提示：做市商推荐选择90¢以上的标的，风险更低。")
-                confirm = input("  确认选择市价卖出全部？(y/n): ").strip().lower()
+                confirm = "y" if confirm("  确认选择市价卖出全部") else "n"
                 if confirm == 'y':
                     emergency_position_action = 'sell_all'
                 else:
@@ -4800,11 +4814,11 @@ class OpinionSDKTrader:
                 print("\n  ⚠️  警告：市价卖出可能存在较大滑点！")
                 print("     在盘口深度不足或剧烈波动时，实际成交价可能远低于预期。")
                 print("  💡 提示：做市商推荐选择90¢以上的标的，风险更低。")
-                sell_pct_input = input("  卖出比例（百分比，如60表示卖出60%保留40%）: ").strip()
+                sell_pct_input = ask("卖出比例 (%)")
                 emergency_sell_percent = float(
                     sell_pct_input) if sell_pct_input else 50.0
-                confirm = input(
-                    f"  确认紧急时市价卖出{emergency_sell_percent}%？(y/n): ").strip().lower()
+                confirm = ask(
+                    f"  确认紧急时市价卖出{emergency_sell_percent}%？(y/n): ").lower()
                 if confirm == 'y':
                     emergency_position_action = 'sell_partial'
                 else:
@@ -4817,19 +4831,19 @@ class OpinionSDKTrader:
         # ============ 价格参数 ============
         print("\n[价格参数]")
         print("  最小价差: 当买1和卖1价差小于此值时，暂停挂单")
-        min_spread_input = input("最小价差阈值（分，默认0.1）: ").strip()
+        min_spread_input = ask("最小价差阈值（分，默认0.1）")
         min_spread = float(min_spread_input) if min_spread_input else 0.1
 
         print("  价格步长: 调整挂单价格的最小单位")
-        price_step_input = input("价格调整步长（分，默认0.1）: ").strip()
+        price_step_input = ask("价格调整步长（分，默认0.1）")
         price_step = float(price_step_input) if price_step_input else 0.1
 
         # ============ 单笔金额 ============
         print("\n[单笔金额]")
-        order_min_input = input("单笔最小金额（美元，默认5）: ").strip()
+        order_min_input = ask("单笔最小金额（美元，默认5）")
         order_min = float(order_min_input) if order_min_input else 5.0
 
-        order_max_input = input("单笔最大金额（美元，默认20）: ").strip()
+        order_max_input = ask("单笔最大金额（美元，默认20）")
         order_max = float(order_max_input) if order_max_input else 20.0
 
         # ============ 止损设置 ============
@@ -4838,22 +4852,22 @@ class OpinionSDKTrader:
         print("  2. 按亏损金额止损")
         print("  3. 按价格止损")
         print("  0. 不设置止损")
-        sl_choice = input("请选择 (0-3, 默认0): ").strip() or '0'
+        sl_choice = ask("请选择 (0-3, 默认0)", default="0")
 
         sl_percent = sl_amount = sl_price = 0
         if sl_choice == '1':
-            sl_percent = float(input("亏损百分比（如5表示亏5%止损）: ").strip() or '0')
+            sl_percent = ask_float("亏损百分比（如5表示亏5%止损）: ", default=0)
         elif sl_choice == '2':
-            sl_amount = float(input("亏损金额（美元）: ").strip() or '0')
+            sl_amount = ask_float("亏损金额（美元）: ", default=0)
         elif sl_choice == '3':
-            sl_price = float(input("止损价格（分）: ").strip() or '0')
+            sl_price = ask_float("止损价格（分）: ", default=0)
 
         # ============ 挂单策略选择 (二选一) ============
         print("\n[挂单策略选择] 网格策略与分层挂单二选一:")
         print("  1. 网格策略 - 追踪买入成本，买入后自动按 买入价+利润 挂卖单")
         print("  2. 分层挂单 - 在多个价格层级分散挂单，增加订单簿厚度")
         print("  0. 返回主菜单")
-        strategy_choice = input("请选择 (0/1/2): ").strip()
+        strategy_choice = ask("请选择 (0/1/2)")
 
         if strategy_choice == '0':
             print("返回主菜单...")
@@ -4879,33 +4893,32 @@ class OpinionSDKTrader:
             print("  (例如: 买入价99.1 + 目标利润0.1 = 卖出价99.2)")
 
             # 利润价差
-            profit_input = input("  目标利润(默认0.1): ").strip()
+            profit_input = ask("  目标利润(默认0.1)")
             grid_profit_spread = float(profit_input) if profit_input else 0.1
 
             # 最小利润价差
-            min_profit_input = input("  最小利润(低于此值不卖，默认0.05): ").strip()
+            min_profit_input = ask("  最小利润(低于此值不卖，默认0.05)")
             grid_min_profit_spread = float(
                 min_profit_input) if min_profit_input else 0.05
 
             # 网格层数
-            levels_input = input("  网格层数（默认5）: ").strip()
+            levels_input = ask("  网格层数（默认5）")
             grid_levels = int(levels_input) if levels_input else 5
 
             # 层间距
-            spread_input = input("  每层间隔(默认0.1): ").strip()
+            spread_input = ask("  每层间隔(默认0.1)")
             grid_level_spread = float(spread_input) if spread_input else 0.1
 
             # 每层金额
-            amount_input = input("  每层挂单金额（美元，默认10）: ").strip()
+            amount_input = ask("  每层挂单金额（美元，默认10）")
             grid_amount_per_level = float(
                 amount_input) if amount_input else 10.0
 
             # 自动再平衡
-            rebalance_input = input(
-                "  卖出后自动在买1价重新挂买? (y/n, 默认y): ").strip().lower()
+            rebalance_input = ask("  卖出后自动在买1价重新挂买? (y/n, 默认y): ").lower()
             grid_auto_rebalance = rebalance_input != 'n'
 
-            print(f"\n  ✓ 网格策略已启用")
+            success(f"网格策略已启用")
             print(f"    利润价差: {grid_profit_spread}")
             print(f"    网格层数: {grid_levels} 层")
             print(f"    层间距: {grid_level_spread}")
@@ -4919,7 +4932,7 @@ class OpinionSDKTrader:
             print("  示例: 1 5 10 表示在买1/卖1、买5/卖5、买10/卖10挂单")
             print("  常用: 1 3 5 7 10 或 1 2 3 4 5")
 
-            levels_input = input("  价格层级 (默认 1 5 10): ").strip()
+            levels_input = ask("  价格层级 (默认 1 5 10)")
             if levels_input:
                 try:
                     price_levels = [int(x) for x in levels_input.split()]
@@ -4927,12 +4940,12 @@ class OpinionSDKTrader:
                     if not all(x > 0 for x in price_levels):
                         raise ValueError("层级必须为正整数")
                 except ValueError:
-                    print("  [!] 格式错误，使用默认值")
+                    warning("格式错误，使用默认值")
                     price_levels = [1, 5, 10]
             else:
                 price_levels = [1, 5, 10]
 
-            print(f"  ✓ 价格层级: {price_levels}")
+            success(f"价格层级: {price_levels}")
 
             # 分布模式
             print("\n  选择分布模式:")
@@ -4941,7 +4954,7 @@ class OpinionSDKTrader:
             print("    3. 倒金字塔（第1层多，最后一层少）")
             print("    4. 自定义比例")
 
-            dist_choice = input("  请选择 (1-4，默认1): ").strip() or '1'
+            dist_choice = ask("  请选择 (1-4，默认1)", default="1")
             dist_map = {'1': 'uniform', '2': 'pyramid',
                         '3': 'inverse_pyramid', '4': 'custom'}
             distribution_mode = dist_map.get(dist_choice, 'uniform')
@@ -4950,24 +4963,23 @@ class OpinionSDKTrader:
                 print(f"  请输入各层的分配比例，共{len(price_levels)}层")
                 print(f"  示例: 1 2 3 表示按 1:2:3 分配")
                 while True:
-                    ratios_input = input(
-                        f"  分配比例 ({len(price_levels)}个数字): ").strip()
+                    ratios_input = ask(f"  分配比例 ({len(price_levels)}个数字): ")
                     try:
                         custom_ratios = [float(x)
                                          for x in ratios_input.split()]
                         if len(custom_ratios) != len(price_levels):
-                            print(f"  [!] 需要输入{len(price_levels)}个数字")
+                            warning(f"需要输入{len(price_levels)}个数字")
                             continue
                         if not all(x > 0 for x in custom_ratios):
-                            print("  [!] 比例必须为正数")
+                            warning("比例必须为正数")
                             continue
                         break
                     except ValueError:
-                        print("  [!] 格式错误，请输入数字")
+                        warning("格式错误，请输入数字")
 
             dist_names = {'uniform': '垂直分布', 'pyramid': '金字塔',
                           'inverse_pyramid': '倒金字塔', 'custom': '自定义'}
-            print(f"  ✓ 分布模式: {dist_names[distribution_mode]}")
+            success(f"分布模式: {dist_names[distribution_mode]}")
 
         # 买卖共用分层配置
         layered_sell_enabled = layered_enabled
@@ -4983,36 +4995,36 @@ class OpinionSDKTrader:
         # ============ 成本加成卖出配置 ============
         print("\n[成本加成卖出] 卖出价 = 平均买入成本 + 利润价差")
         print("  启用后卖单不再跟随市场价下跌，而是根据买入成本定价")
-        cost_choice = input("是否启用成本加成定价? (y/n, 默认n): ").strip().lower()
+        cost_choice = ask("是否启用成本加成定价? (y/n, 默认n)").lower()
         cost_based_sell_enabled = cost_choice == 'y'
 
         sell_profit_spread = 1.0
         min_cost_profit_spread = 0.5
 
         if cost_based_sell_enabled:
-            profit_input = input("  卖出利润价差（分，默认1）: ").strip()
+            profit_input = ask("  卖出利润价差（分，默认1）")
             sell_profit_spread = float(profit_input) if profit_input else 1.0
 
-            min_input = input("  最小利润价差（分，默认0.5）: ").strip()
+            min_input = ask("  最小利润价差（分，默认0.5）")
             min_cost_profit_spread = float(min_input) if min_input else 0.5
 
-            print(f"\n  ✓ 成本加成已启用: 卖出价 = 均价 + {sell_profit_spread}¢")
+            success(f"成本加成已启用: 卖出价 = 均价 + {sell_profit_spread}¢")
 
         # ============ 运行参数 ============
         print("\n[运行参数]")
-        interval_input = input("盘口检查间隔（秒，默认2）: ").strip()
+        interval_input = ask("盘口检查间隔（秒，默认2）")
         check_interval = float(interval_input) if interval_input else 2.0
 
         # ============ WebSocket 模式 ============
         print("\n[数据模式]")
         print("  1. 轮询模式（传统，稳定）")
         print("  2. WebSocket 模式（实时推送，低延迟）")
-        ws_choice = input("请选择 (1/2, 默认2): ").strip()
+        ws_choice = ask("请选择 (1/2, 默认2)")
         use_websocket = ws_choice != '1'  # 默认使用 WebSocket
         if use_websocket:
-            print("  ✓ 已启用 WebSocket 实时数据模式")
+            success("已启用 WebSocket 实时数据模式")
         else:
-            print("  ✓ 使用轮询模式")
+            success("使用轮询模式")
 
         return MarketMakerConfig(
             market_id=market_id,
@@ -5083,9 +5095,7 @@ class OpinionSDKTrader:
 
     def _mm_show_config(self, config: MarketMakerConfig, account_indices: list):
         """显示配置确认信息"""
-        print(f"\n{'='*60}")
-        print(f"{'做市商配置确认':^60}")
-        print(f"{'='*60}")
+        section("做市商配置确认")
         print(f"  参与账户: {len(account_indices)}个")
         print(f"  市场: {config.market_title or config.market_id}")
         print(f"  Token ID: {config.token_id}")
@@ -5171,15 +5181,13 @@ class OpinionSDKTrader:
 
     def _batch_market_maker_menu(self, selected_account_indices: list):
         """批量多市场做市配置入口"""
-        print(f"\n{'='*60}")
-        print(f"{'批量多市场做市配置':^60}")
-        print(f"{'='*60}")
+        section("批量多市场做市配置")
         print("说明: 为多个市场分配不同账户进行做市")
         print("      每个市场可以分配一个或多个账户")
 
         # 1. 输入多个市场ID
         print("\n请输入市场ID列表（逗号分隔，如: 123,456,789）")
-        market_ids_input = input("市场IDs: ").strip()
+        market_ids_input = ask("市场IDs")
         if not market_ids_input:
             return
 
@@ -5187,7 +5195,7 @@ class OpinionSDKTrader:
             market_ids = [int(x.strip()) for x in market_ids_input.split(',')]
             market_ids = list(set(market_ids))  # 去重
         except ValueError:
-            print("✗ 请输入有效的数字列表")
+            error("请输入有效的数字列表")
             return
 
         print(f"\n将配置 {len(market_ids)} 个市场: {market_ids}")
@@ -5197,9 +5205,9 @@ class OpinionSDKTrader:
         market_configs = []  # 存储每个市场的配置信息
 
         for market_id in market_ids:
-            print(f"\n{'─'*40}")
+            divider(width=40)
             print(f"配置市场 {market_id}")
-            print(f"{'─'*40}")
+            divider()
 
             try:
                 # 获取市场信息
@@ -5210,15 +5218,14 @@ class OpinionSDKTrader:
                     market_data = categorical_response.result.data
                     if hasattr(market_data, 'child_markets') and market_data.child_markets:
                         child_markets = market_data.child_markets
-                        print(f"✓ 分类市场: {market_data.market_title}")
+                        success(f"分类市场: {market_data.market_title}")
                         print(f"子市场列表:")
                         for i, child in enumerate(child_markets, 1):
                             child_title = child.market_title if hasattr(
                                 child, 'market_title') else f"子市场{i}"
                             print(f"  {i}. {child_title}")
 
-                        child_choice = input(
-                            f"选择子市场 (1-{len(child_markets)}): ").strip()
+                        child_choice = ask(f"选择子市场 (1-{len(child_markets)}): ")
                         try:
                             child_idx = int(child_choice) - 1
                             if 0 <= child_idx < len(child_markets):
@@ -5228,26 +5235,26 @@ class OpinionSDKTrader:
                                 child_response = client.get_market(
                                     market_id=market_id)
                                 if child_response.errno != 0 or not child_response.result or not child_response.result.data:
-                                    print(f"✗ 无法获取子市场详细信息")
+                                    error(f"无法获取子市场详细信息")
                                     continue
                                 market_data = child_response.result.data
                             else:
-                                print("✗ 跳过此市场")
+                                error("跳过此市场")
                                 continue
                         except ValueError:
-                            print("✗ 跳过此市场")
+                            error("跳过此市场")
                             continue
                 else:
                     market_response = client.get_market(market_id=market_id)
                     if market_response.errno != 0:
-                        print(f"✗ 无法获取市场: {market_response.errmsg}")
+                        error(f"无法获取市场: {market_response.errmsg}")
                         continue
                     market_data = market_response.result.data
-                    print(f"✓ 市场: {market_data.market_title}")
+                    success(f"市场: {market_data.market_title}")
 
                 # 选择YES/NO
                 print("交易方向: 1=YES, 2=NO")
-                side_choice = input("选择 (1/2): ").strip()
+                side_choice = ask("选择 (1/2)")
                 if side_choice == '1':
                     token_id = market_data.yes_token_id if hasattr(
                         market_data, 'yes_token_id') else None
@@ -5257,16 +5264,16 @@ class OpinionSDKTrader:
                         market_data, 'no_token_id') else None
                     token_name = "NO"
                 else:
-                    print("✗ 跳过此市场")
+                    error("跳过此市场")
                     continue
 
                 if not token_id:
-                    print("✗ 无法获取Token ID")
+                    error("无法获取Token ID")
                     continue
 
                 # 选择要分配的账户
                 print(f"\n可用账户: {selected_account_indices}")
-                acc_input = input("分配账户 (逗号分隔，如 1,2,3，或 'all'): ").strip()
+                acc_input = ask("分配账户 (逗号分隔，如 1,2,3，或 'all')")
                 if acc_input.lower() == 'all':
                     assigned_accounts = selected_account_indices.copy()
                 else:
@@ -5276,11 +5283,11 @@ class OpinionSDKTrader:
                         assigned_accounts = [
                             a for a in assigned_accounts if a in selected_account_indices]
                     except ValueError:
-                        print("✗ 跳过此市场")
+                        error("跳过此市场")
                         continue
 
                 if not assigned_accounts:
-                    print("✗ 没有有效账户")
+                    error("没有有效账户")
                     continue
 
                 market_configs.append({
@@ -5289,20 +5296,18 @@ class OpinionSDKTrader:
                     'token_id': token_id,
                     'accounts': assigned_accounts
                 })
-                print(f"✓ 已配置: {len(assigned_accounts)}个账户")
+                success(f"已配置: {len(assigned_accounts)}个账户")
 
             except Exception as e:
-                print(f"✗ 异常: {e}")
+                error(f"异常: {e}")
                 continue
 
         if not market_configs:
-            print("\n✗ 没有有效的市场配置")
+            error("没有有效的市场配置")
             return
 
         # 3. 配置统一的做市参数
-        print(f"\n{'='*60}")
-        print(f"{'配置统一的做市参数（将应用于所有市场）':^60}")
-        print(f"{'='*60}")
+        section("配置统一的做市参数（将应用于所有市场）")
 
         # 使用第一个市场的盘口作为价格参考
         first_config = market_configs[0]
@@ -5320,9 +5325,7 @@ class OpinionSDKTrader:
             return
 
         # 4. 显示所有配置
-        print(f"\n{'='*60}")
-        print(f"{'批量做市配置确认':^60}")
-        print(f"{'='*60}")
+        section("批量做市配置确认")
         print(f"共 {len(market_configs)} 个市场:")
         for mc in market_configs:
             print(f"  • {mc['market_title']}")
@@ -5342,22 +5345,22 @@ class OpinionSDKTrader:
         print(
             f"  单笔金额: ${base_config.order_amount_min}-${base_config.order_amount_max}")
 
-        confirm = input("\n确认开始批量做市？输入 'start' 启动: ").strip().lower()
+        confirm = ask("确认开始批量做市？输入 'start' 启动: ").lower()
         if confirm != 'start':
-            print("✗ 已取消")
+            error("已取消")
             return
 
         # 5. 选择运行模式
         print("\n[运行模式]")
         print("  1. 前台运行（关闭终端后停止）")
         print("  2. 后台运行（守护进程，关闭终端后继续运行）")
-        mode_choice = input("请选择 (1/2, 默认1): ").strip()
+        mode_choice = ask("请选择 (1/2)", default="1")
 
         if mode_choice == '2':
             # 检查是否已有守护进程
             running, pid = DaemonProcess.is_running()
             if running:
-                print(f"\n✗ 已有守护进程在运行 (PID: {pid})")
+                error(f"已有守护进程在运行 (PID: {pid})")
                 print(f"  使用 'python trade.py stop' 停止")
                 return
 
@@ -5375,10 +5378,10 @@ class OpinionSDKTrader:
         import threading
         import copy
 
-        print(f"\n{'='*60}")
+        console.print()
         print(f"批量做市商已启动 ({len(market_configs)}个市场)")
         print("按 Ctrl+C 停止")
-        print(f"{'='*60}")
+        divider("═")
 
         all_states = {}  # {(market_id, acc_idx): state}
         threads = []
@@ -5430,9 +5433,7 @@ class OpinionSDKTrader:
 
     def _mm_show_batch_summary(self, market_configs: list, all_states: dict):
         """显示批量做市汇总（增强版）"""
-        print(f"\n{'='*60}")
-        print(f"{'批量做市汇总':^60}")
-        print(f"{'='*60}")
+        section("批量做市汇总")
 
         # 总统计
         grand_total_pnl = 0
@@ -5499,9 +5500,7 @@ class OpinionSDKTrader:
             grand_total_trades += market_trades
 
         # 总汇总
-        print(f"\n{'='*60}")
-        print(f"{'全部市场汇总':^60}")
-        print(f"{'='*60}")
+        section("全部市场汇总")
         print(f"  总交易: {grand_total_trades}笔")
         print(
             f"  总买入: {grand_total_buy_shares}份, 成本${grand_total_buy_cost:.2f}")
@@ -5522,7 +5521,7 @@ class OpinionSDKTrader:
             rate_str = f"+{pnl_rate:.2f}%" if pnl_rate >= 0 else f"{pnl_rate:.2f}%"
             print(f"    盈亏率: {rate_str}")
 
-        print(f"{'='*60}")
+        divider("═")
 
     def _run_market_maker(self, config: MarketMakerConfig, account_indices: list):
         """运行做市商 - 多账户并行"""
@@ -5540,10 +5539,10 @@ class OpinionSDKTrader:
         import threading
         import copy
 
-        print(f"\n{'='*60}")
-        print(f"{'做市商已启动 [轮询模式]':^60}")
+        console.print()
+        console.print(f"[bold]做市商已启动 [轮询模式][/bold]", justify="center")
         print("按 Ctrl+C 停止")
-        print(f"{'='*60}")
+        divider("═")
 
         # 为每个账户创建独立的状态
         states = {}
@@ -5597,10 +5596,10 @@ class OpinionSDKTrader:
                             cancelled += 1
                         state.sell_order_id = None
                     if cancelled > 0:
-                        print(f"  [{cfg.remark}] ✓ 已撤销 {cancelled} 个挂单")
+                        success(f"[{cfg.remark}] 已撤销 {cancelled} 个挂单")
                 except Exception as e:
-                    print(f"  [{cfg.remark}] ✗ 撤单异常: {e}")
-            print(f"✓ 撤单完成")
+                    error(f"[{cfg.remark}] 撤单异常: {e}")
+            success(f"撤单完成")
 
         # 等待所有线程结束
         for t in threads:
@@ -5613,10 +5612,11 @@ class OpinionSDKTrader:
         """运行做市商 - WebSocket 实时模式"""
         import threading
 
-        print(f"\n{'='*60}")
-        print(f"{'做市商已启动 [WebSocket 实时模式]':^60}")
+        console.print()
+        console.print(f"[bold]做市商已启动 [WebSocket 实时模式][/bold]",
+                      justify="center")
         print("按 Ctrl+C 停止")
-        print(f"{'='*60}")
+        divider("═")
 
         # 使用第一个账户的 API Key 连接 WebSocket
         api_key = self.configs[account_indices[0] - 1].api_key
@@ -5711,7 +5711,7 @@ class OpinionSDKTrader:
         async def ws_main():
             # 连接 WebSocket
             if not await ws_service.connect():
-                print("✗ WebSocket 连接失败，回退到轮询模式")
+                error("WebSocket 连接失败，回退到轮询模式")
                 return False
 
             # 订阅订单簿和成交
@@ -5773,10 +5773,10 @@ class OpinionSDKTrader:
                     print(
                         f"  ✓ 已获取初始盘口快照 (买{len(orderbook.bids or [])}档, 卖{len(orderbook.asks or [])}档)")
                 else:
-                    print(f"  [!] 盘口为空 (买0档, 卖0档)")
+                    warning(f"盘口为空 (买0档, 卖0档)")
         else:
             error_msg = ob.get('error', '未知错误')
-            print(f"  [!] 获取初始盘口失败: {error_msg}")
+            warning(f"获取初始盘口失败: {error_msg}")
 
         # 启动所有做市线程
         for t in threads:
@@ -5812,10 +5812,10 @@ class OpinionSDKTrader:
                             cancelled += 1
                         state.sell_order_id = None
                     if cancelled > 0:
-                        print(f"  [{cfg.remark}] ✓ 已撤销 {cancelled} 个挂单")
+                        success(f"[{cfg.remark}] 已撤销 {cancelled} 个挂单")
                 except Exception as e:
-                    print(f"  [{cfg.remark}] ✗ 撤单异常: {e}")
-            print(f"✓ 撤单完成")
+                    error(f"[{cfg.remark}] 撤单异常: {e}")
+            success(f"撤单完成")
 
             # 停止 WebSocket（使用安全方式避免错误）
             if ws_loop:
@@ -5850,7 +5850,7 @@ class OpinionSDKTrader:
             wait_count += 1
 
         if not shared_orderbook['last_update']:
-            print(f"[{cfg.remark}] ✗ 未收到盘口数据，退出")
+            error(f"[{cfg.remark}] 未收到盘口数据，退出")
             state.is_running = False
             return
 
@@ -5892,9 +5892,9 @@ class OpinionSDKTrader:
                     print(
                         f"[{cfg.remark}] ✓ 现有持仓已挂卖单: {sell_info['shares']}份 @ {self.format_price(sell_info['price'])}¢")
                 else:
-                    print(f"[{cfg.remark}] ✗ 挂卖单失败: {result.errmsg}")
+                    error(f"[{cfg.remark}] 挂卖单失败: {result.errmsg}")
             except Exception as e:
-                print(f"[{cfg.remark}] ✗ 挂卖单异常: {e}")
+                error(f"[{cfg.remark}] 挂卖单异常: {e}")
 
         # 同时挂初始买单（如果未达持仓上限）
         position_ok = self._mm_check_position_limit(client, cfg, config, state)
@@ -5933,7 +5933,7 @@ class OpinionSDKTrader:
                                 print(
                                     f"[{cfg.remark}] ✗ 初始买单失败: {result.errmsg}")
                         except Exception as e:
-                            print(f"[{cfg.remark}] ✗ 初始买单异常: {e}")
+                            error(f"[{cfg.remark}] 初始买单异常: {e}")
 
         try:
             while state.is_running and not stop_event.is_set():
@@ -5982,7 +5982,7 @@ class OpinionSDKTrader:
                         continue
                     else:
                         if state.depth_insufficient:
-                            print(f"[{cfg.remark}] ✓ 盘口深度恢复")
+                            success(f"[{cfg.remark}] 盘口深度恢复")
                             state.depth_insufficient = False
 
                 # 检测深度骤降
@@ -6000,7 +6000,7 @@ class OpinionSDKTrader:
                         time.sleep(config.check_interval * 2)
                         continue
                     elif state.depth_drop_triggered:
-                        print(f"[{cfg.remark}] ✓ 盘口深度恢复正常")
+                        success(f"[{cfg.remark}] 盘口深度恢复正常")
                         state.depth_drop_triggered = False
 
                 # 检查价差
@@ -6082,9 +6082,9 @@ class OpinionSDKTrader:
                     print(
                         f"[{cfg.remark}] ✓ 现有持仓已挂卖单: {sell_info['shares']}份 @ {self.format_price(sell_info['price'])}¢")
                 else:
-                    print(f"[{cfg.remark}] ✗ 挂卖单失败: {result.errmsg}")
+                    error(f"[{cfg.remark}] 挂卖单失败: {result.errmsg}")
             except Exception as e:
-                print(f"[{cfg.remark}] ✗ 挂卖单异常: {e}")
+                error(f"[{cfg.remark}] 挂卖单异常: {e}")
 
         # 同时挂初始买单（如果未达持仓上限）
         position_ok = self._mm_check_position_limit(client, cfg, config, state)
@@ -6115,9 +6115,9 @@ class OpinionSDKTrader:
                         print(
                             f"[{cfg.remark}] ✓ 初始买单: ${initial_amount:.2f} @ {self.format_price(initial_buy_price)}¢")
                     else:
-                        print(f"[{cfg.remark}] ✗ 初始买单失败: {result.errmsg}")
+                        error(f"[{cfg.remark}] 初始买单失败: {result.errmsg}")
                 except Exception as e:
-                    print(f"[{cfg.remark}] ✗ 初始买单异常: {e}")
+                    error(f"[{cfg.remark}] 初始买单异常: {e}")
 
         try:
             while state.is_running and not stop_event.is_set():
@@ -6184,7 +6184,7 @@ class OpinionSDKTrader:
                         continue
                     elif state.depth_drop_triggered:
                         # 深度恢复正常
-                        print(f"[{cfg.remark}] ✓ 盘口深度恢复正常")
+                        success(f"[{cfg.remark}] 盘口深度恢复正常")
                         state.depth_drop_triggered = False
 
                 # 3. 检查价差是否满足条件
@@ -6364,7 +6364,7 @@ class OpinionSDKTrader:
             state.sell_order_price = 0
 
         if cancelled > 0:
-            print(f"[{cfg.remark}] ✓ 已撤销 {cancelled} 个订单")
+            success(f"[{cfg.remark}] 已撤销 {cancelled} 个订单")
 
         # 根据配置处理持仓
         if config.emergency_position_action != 'hold':
@@ -6402,14 +6402,14 @@ class OpinionSDKTrader:
             )
             result = client.place_order(order, check_approval=True)
             if result.errno == 0:
-                print(f"[{cfg.remark}] ✓ 紧急卖出 {shares}份 成功")
+                success(f"[{cfg.remark}] 紧急卖出 {shares}份 成功")
                 # 记录卖出
                 self._mm_record_sell_fill(cfg, state, shares, 0)  # 价格未知，记0
             else:
                 print(
                     f"[{cfg.remark}] ✗ 紧急卖出失败: {self.translate_error(result.errmsg)}")
         except Exception as e:
-            print(f"[{cfg.remark}] ✗ 紧急卖出异常: {e}")
+            error(f"[{cfg.remark}] 紧急卖出异常: {e}")
 
     def _mm_get_orderbook(self, client, token_id: str):
         """获取盘口数据"""
@@ -6481,7 +6481,7 @@ class OpinionSDKTrader:
                             print(f"[{cfg.remark}] ⚠️ 买价触及边界保护，暂停跟随")
                         elif not boundary_hit and state.price_boundary_hit:
                             state.price_boundary_hit = False
-                            print(f"[{cfg.remark}] ✓ 买价回到安全区间，恢复跟随")
+                            success(f"[{cfg.remark}] 买价回到安全区间，恢复跟随")
 
                         if need_adjust:
                             print(
@@ -6543,7 +6543,7 @@ class OpinionSDKTrader:
                             print(f"[{cfg.remark}] ⚠️ 卖价触及边界保护，暂停跟随")
                         elif not boundary_hit and state.price_boundary_hit:
                             state.price_boundary_hit = False
-                            print(f"[{cfg.remark}] ✓ 卖价回到安全区间，恢复跟随")
+                            success(f"[{cfg.remark}] 卖价回到安全区间，恢复跟随")
 
                         if need_adjust:
                             print(
@@ -6630,7 +6630,7 @@ class OpinionSDKTrader:
                     print(
                         f"[{cfg.remark}] ✗ 挂买失败: {self.translate_error(result.errmsg)}")
             except Exception as e:
-                print(f"[{cfg.remark}] ✗ 挂买异常: {e}")
+                error(f"[{cfg.remark}] 挂买异常: {e}")
 
     def _mm_place_layered_buy_orders(self, client, cfg, config: MarketMakerConfig,
                                      state: MarketMakerState, bids: list):
@@ -6695,7 +6695,7 @@ class OpinionSDKTrader:
                 time.sleep(0.3)  # 避免请求过快
 
             except Exception as e:
-                print(f"[{cfg.remark}] ✗ 买{level}异常: {e}")
+                error(f"[{cfg.remark}] 买{level}异常: {e}")
 
         # 更新状态（使用第一个订单作为参考）
         if first_order_id:
@@ -6735,7 +6735,7 @@ class OpinionSDKTrader:
                     print(
                         f"[{cfg.remark}] ✗ 挂卖失败: {self.translate_error(result.errmsg)}")
             except Exception as e:
-                print(f"[{cfg.remark}] ✗ 挂卖异常: {e}")
+                error(f"[{cfg.remark}] 挂卖异常: {e}")
 
     def _configure_layered_order(self, side: str, bid_details: list, ask_details: list,
                                  format_price) -> Optional[dict]:
@@ -6763,7 +6763,7 @@ class OpinionSDKTrader:
         print(f"  1. 按盘口档位 (如 买1-买3-买5 或 卖1-卖3-卖5)")
         print(f"  2. 自定义价格区间 (指定起始价、结束价、层数)")
         print(f"  3. 自定义价格列表 (如: 60 62 65 70)")
-        price_mode_choice = input("请选择 (1/2/3): ").strip()
+        price_mode_choice = ask("请选择 (1/2/3)")
 
         prices = []
         price_mode = 'levels'
@@ -6779,12 +6779,12 @@ class OpinionSDKTrader:
 
             print(f"\n输入价格列表，用空格分隔 (单位: 分)")
             print(f"示例: 60 62 65 70 表示在 60¢、62¢、65¢、70¢ 四个价格挂单")
-            prices_input = input("请输入价格: ").strip()
+            prices_input = ask("请输入价格")
 
             try:
                 price_cents_list = [float(x) for x in prices_input.split()]
                 if not price_cents_list:
-                    print("[!] 未输入价格")
+                    warning("未输入价格")
                     return None
 
                 # 将"分"转换为小数格式 (60分 -> 0.60)，并四舍五入到0.1分
@@ -6792,12 +6792,12 @@ class OpinionSDKTrader:
                 # 验证价格范围
                 for p in prices:
                     if p < 0.01 or p > 0.99:
-                        print(f"[!] 价格 {p*100:.1f}¢ 超出有效范围 (1-99分)")
+                        warning(f"价格 {p*100:.1f}¢ 超出有效范围 (1-99分)")
                         return None
                 print(
                     f"\n✓ 价格层级 ({len(prices)}层): {', '.join([f'{format_price(p)}¢' for p in prices])}")
             except ValueError:
-                print("[!] 输入格式错误，请输入数字")
+                warning("输入格式错误，请输入数字")
                 return None
         elif price_mode_choice == '2':
             # 自定义价格区间
@@ -6809,8 +6809,8 @@ class OpinionSDKTrader:
                 print(f"  卖1: {format_price(ask_details[0][1])}¢")
 
             try:
-                start_price_cents = float(input(f"起始价格 (分): ").strip())
-                end_price_cents = float(input(f"结束价格 (分): ").strip())
+                start_price_cents = ask_float(f"起始价格 (分): ")
+                end_price_cents = ask_float(f"结束价格 (分): ")
 
                 # 计算最大可用层数（最小价差0.1分）
                 price_range = abs(end_price_cents - start_price_cents)
@@ -6818,11 +6818,11 @@ class OpinionSDKTrader:
                     1 if price_range > 0 else 1
 
                 if max_levels < 2:
-                    print(f"[!] 价格区间太小，无法分层")
+                    warning(f"价格区间太小，无法分层")
                     return None
 
-                num_levels = int(input(
-                    f"分层数量 (2-{max_levels}, 默认{min(5, max_levels)}): ").strip() or str(min(5, max_levels)))
+                num_levels = ask_int(
+                    f"分层数量 (2-{max_levels})", default=min(5, max_levels))
                 num_levels = max(2, min(max_levels, num_levels))
 
                 # 将"分"转换为小数格式 (60分 -> 0.60)
@@ -6839,7 +6839,7 @@ class OpinionSDKTrader:
                 print(
                     f"\n✓ 价格层级: {', '.join([f'{format_price(p)}¢' for p in prices])}")
             except ValueError:
-                print("[!] 输入格式错误")
+                warning("输入格式错误")
                 return None
         else:
             # 按盘口档位
@@ -6855,7 +6855,7 @@ class OpinionSDKTrader:
 
             print(
                 f"\n输入档位，用空格分隔 (如: 1 3 5 表示{book_name}1、{book_name}3、{book_name}5)")
-            levels_input = input(f"请输入档位 (默认: 1 3 5): ").strip()
+            levels_input = ask(f"请输入档位 (默认: 1 3 5): ")
             if not levels_input:
                 levels_input = "1 3 5"
 
@@ -6887,10 +6887,10 @@ class OpinionSDKTrader:
                     print(
                         f"  对应价格: {', '.join([f'{format_price(p)}¢' for p in prices])}")
                 else:
-                    print("[!] 无法获取价格")
+                    warning("无法获取价格")
                     return None
             except ValueError:
-                print("[!] 输入格式错误")
+                warning("输入格式错误")
                 return None
 
         if not prices:
@@ -6909,7 +6909,7 @@ class OpinionSDKTrader:
             print(f"  2. 金字塔 (低价多卖，高价少卖)")
             print(f"  3. 倒金字塔 (低价少卖，高价多卖)")
         print(f"  4. 自定义比例")
-        dist_choice = input("请选择 (1/2/3/4, 默认1): ").strip() or '1'
+        dist_choice = ask("请选择 (1/2/3/4, 默认1)", default="1")
 
         distribution = 'uniform'
         custom_ratios = []
@@ -6922,7 +6922,7 @@ class OpinionSDKTrader:
             distribution = 'custom'
             print(f"\n输入各层比例，用空格分隔 (需要{len(prices)}个数字)")
             print(f"  示例: 1 2 3 表示第一层占1份，第二层占2份，第三层占3份")
-            ratios_input = input(f"请输入比例: ").strip()
+            ratios_input = ask(f"请输入比例: ")
             try:
                 custom_ratios = [float(x) for x in ratios_input.split()]
                 if len(custom_ratios) != len(prices):
@@ -6931,7 +6931,7 @@ class OpinionSDKTrader:
                     distribution = 'uniform'
                     custom_ratios = []
             except ValueError:
-                print("[!] 输入格式错误，使用均匀分布")
+                warning("输入格式错误，使用均匀分布")
                 distribution = 'uniform'
 
         dist_names = {
@@ -6940,7 +6940,7 @@ class OpinionSDKTrader:
             'inverse_pyramid': '倒金字塔',
             'custom': '自定义'
         }
-        print(f"\n✓ 分布模式: {dist_names[distribution]}")
+        success(f"分布模式: {dist_names[distribution]}")
 
         # 显示预览
         ratios = self._calculate_distribution_ratios(
@@ -6950,7 +6950,7 @@ class OpinionSDKTrader:
         for i, (price, ratio) in enumerate(zip(prices, ratios), 1):
             print(f"  第{i}层: {format_price(price)}¢ - 占比 {ratio*100:.1f}%")
 
-        confirm = input(f"\n确认配置? (y/n, 默认y): ").strip().lower()
+        confirm = ask(f"确认配置? (y/n, 默认y): ").lower()
         if confirm == 'n':
             return None
 
@@ -7010,7 +7010,7 @@ class OpinionSDKTrader:
                     price_display = self.format_price(price)
 
                     if result.errno == 0:
-                        print(f"    ✓ 第{i}层: ${amount:.2f} @ {price_display}¢")
+                        success(f"第{i}层: ${amount:.2f} @ {price_display}¢")
                         results['success'] += 1
                         results['orders'].append({
                             'level': i,
@@ -7042,7 +7042,7 @@ class OpinionSDKTrader:
                     price_display = self.format_price(price)
 
                     if result.errno == 0:
-                        print(f"    ✓ 第{i}层: {shares}份 @ {price_display}¢")
+                        success(f"第{i}层: {shares}份 @ {price_display}¢")
                         results['success'] += 1
                         results['orders'].append({
                             'level': i,
@@ -7059,7 +7059,7 @@ class OpinionSDKTrader:
                 time.sleep(0.5)
 
             except Exception as e:
-                print(f"    ✗ 第{i}层异常: {e}")
+                error(f"第{i}层异常: {e}")
                 results['failed'] += 1
 
         return results
@@ -7161,7 +7161,7 @@ class OpinionSDKTrader:
                 time.sleep(0.3)  # 避免请求过快
 
             except Exception as e:
-                print(f"[{cfg.remark}] ✗ 卖{level}异常: {e}")
+                error(f"[{cfg.remark}] 卖{level}异常: {e}")
 
         # 更新状态（使用第一个订单作为参考）
         if first_order_id:
@@ -7530,7 +7530,7 @@ class OpinionSDKTrader:
                 print(
                     f"[{cfg.remark}] ✗ 止损卖出失败: {self.translate_error(result.errmsg)}")
         except Exception as e:
-            print(f"[{cfg.remark}] ✗ 止损卖出异常: {e}")
+            error(f"[{cfg.remark}] 止损卖出异常: {e}")
 
     def _mm_limit_sell_stop_loss(self, client, cfg, config: MarketMakerConfig,
                                  state: MarketMakerState, shares: int):
@@ -7606,11 +7606,11 @@ class OpinionSDKTrader:
                 self._mm_cancel_order_safe(client, order_id)
 
             except Exception as e:
-                print(f"[{cfg.remark}] ✗ 止损异常: {e}")
+                error(f"[{cfg.remark}] 止损异常: {e}")
                 time.sleep(2)
 
         if remaining > 0:
-            print(f"[{cfg.remark}] [!] 止损未完成，剩余{remaining}份")
+            warning(f"[{cfg.remark}] 止损未完成，剩余{remaining}份")
 
     def _mm_cancel_all_orders(self, client, cfg, state: MarketMakerState):
         """撤销所有挂单"""
@@ -7623,9 +7623,7 @@ class OpinionSDKTrader:
 
     def _mm_show_summary(self, states: dict):
         """显示做市商运行汇总（增强版）"""
-        print(f"\n{'='*60}")
-        print(f"{'做市商运行汇总':^60}")
-        print(f"{'='*60}")
+        section("做市商运行汇总")
 
         # 汇总统计
         total_buy_shares = 0
@@ -7739,7 +7737,8 @@ class OpinionSDKTrader:
             if state.depth_drop_triggered:
                 status_flags.append("深度异常")
             if status_flags:
-                print(f"│ [!] 状态: {', '.join(status_flags)}")
+                console.print(
+                    f"│ [yellow]![/yellow] 状态: {', '.join(status_flags)}")
 
             print(f"└{'─'*56}┘")
 
@@ -7761,9 +7760,7 @@ class OpinionSDKTrader:
 
         # 多账户汇总
         if len(states) > 1:
-            print(f"\n{'='*60}")
-            print(f"{'总计汇总':^60}")
-            print(f"{'='*60}")
+            section("总计汇总")
 
             # 总运行时长
             total_duration = latest_end - \
@@ -7807,7 +7804,7 @@ class OpinionSDKTrader:
                 hourly_str = f"+${hourly_pnl:.4f}" if hourly_pnl >= 0 else f"-${abs(hourly_pnl):.4f}"
                 print(f"    时均盈亏: {hourly_str}/小时")
 
-        print(f"\n{'='*60}")
+        console.print()
 
     # ============ 网格策略方法 ============
 
@@ -7872,7 +7869,7 @@ class OpinionSDKTrader:
                     print(
                         f"[{cfg.remark}] ✗ 网格买{level+1}失败: {self.translate_error(result.errmsg)}")
             except Exception as e:
-                print(f"[{cfg.remark}] ✗ 网格买{level+1}异常: {e}")
+                error(f"[{cfg.remark}] 网格买{level+1}异常: {e}")
 
         if orders_placed > 0:
             print(f"[{cfg.remark}] 网格买单已挂出 {orders_placed} 层")
@@ -7983,7 +7980,7 @@ class OpinionSDKTrader:
                 print(
                     f"[{cfg.remark}] ✗ 网格卖单失败: {self.translate_error(result.errmsg)}")
         except Exception as e:
-            print(f"[{cfg.remark}] ✗ 网格卖单异常: {e}")
+            error(f"[{cfg.remark}] 网格卖单异常: {e}")
 
     def _grid_check_sell_filled(self, client, cfg, config: MarketMakerConfig,
                                 state: MarketMakerState, bids: list):
@@ -8027,8 +8024,8 @@ class OpinionSDKTrader:
                         state.matched_shares += shares
 
                         profit_spread = (sell_price - buy_price) * 100
-                        print(f"[{cfg.remark}] ✓ 网格卖单成交: {shares}份 @ {self.format_price(sell_price)}¢ "
-                              f"(买入{self.format_price(buy_price)}¢, 利润{profit_spread:.1f}¢, +${profit:.2f})")
+                        success(
+                            f"[{cfg.remark}] 网格卖单成交: {shares}份 @ {self.format_price(sell_price)}¢  (买入{self.format_price(buy_price)}¢, 利润{profit_spread:.1f}¢, +${profit:.2f})")
 
                         # 从持仓中移除对应记录
                         state.grid_positions = [p for p in state.grid_positions
@@ -8074,7 +8071,7 @@ class OpinionSDKTrader:
                 print(
                     f"[{cfg.remark}] ✓ 网格再平衡: ${config.grid_amount_per_level:.2f} @ {self.format_price(target_price)}¢")
         except Exception as e:
-            print(f"[{cfg.remark}] ✗ 网格再平衡失败: {e}")
+            error(f"[{cfg.remark}] 网格再平衡失败: {e}")
 
     def _grid_cancel_all_orders(self, client, cfg, config: MarketMakerConfig,
                                 state: MarketMakerState):
@@ -8128,9 +8125,9 @@ class OpinionSDKTrader:
         """执行恢复挂卖（挂出之前买入成交的份额）"""
         import threading
 
-        print(f"\n{'='*60}")
+        console.print()
         print(f"开始挂出之前买入成交的份额")
-        print(f"{'='*60}")
+        divider("═")
 
         price_str = f"{sell_price:.6f}"
         price_display = self.format_price(sell_price) + '¢'
@@ -8202,7 +8199,7 @@ class OpinionSDKTrader:
 
                 except Exception as e:
                     with print_lock:
-                        print(f"  [{config.remark}] ✗ 挂卖#{i}异常: {e}")
+                        error(f"[{config.remark}] 挂卖#{i}异常: {e}")
                     fail_count += 1
 
             with print_lock:
@@ -8216,21 +8213,17 @@ class OpinionSDKTrader:
             if i < len(selected_account_indices) - 1:
                 time.sleep(random.uniform(1, 2))
 
-        print(f"\n{'='*60}")
-        print(f"{'挂卖执行完成':^60}")
-        print(f"{'='*60}")
+        section("挂卖执行完成")
 
     def custom_strategy_menu(self):
         """自定义策略菜单"""
-        print(f"\n{'='*60}")
-        print(f"{'自定义交易策略':^60}")
-        print(f"{'='*60}")
+        section("自定义交易策略")
         print("第1步: 输入交易序列")
         print("  格式: 买买买卖卖 或 卖卖买买卖")
         print("  规则: 连续相同操作=并发执行，不同操作=顺序执行")
-        print(f"{'='*60}")
+        divider("═")
 
-        strategy_input = input("\n交易序列 (留空返回): ").strip()
+        strategy_input = ask("交易序列 (留空返回): ")
         if not strategy_input:
             return
 
@@ -8244,7 +8237,7 @@ class OpinionSDKTrader:
                 operations.append('sell')
 
         if not operations:
-            print("✗ 无法解析，请只输入'买'或'卖'")
+            error("无法解析，请只输入'买'或'卖'")
             return
 
         # 分组操作
@@ -8273,14 +8266,14 @@ class OpinionSDKTrader:
         print(f"\n总计: 买入{total_buys}次, 卖出{total_sells}次")
 
         # 询问市场ID
-        market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+        market_id_input = ask("请输入市场ID")
         if not market_id_input:
             return
 
         try:
             market_id = int(market_id_input)
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         # 获取市场信息
@@ -8295,11 +8288,11 @@ class OpinionSDKTrader:
             if categorical_response.errno == 0 and categorical_response.result and categorical_response.result.data:
                 market_data = categorical_response.result.data
                 if not hasattr(market_data, 'market_title') or not market_data.market_title:
-                    print(f"✗ 市场 {market_id} 数据不完整")
+                    error(f"市场 {market_id} 数据不完整")
                     return
 
                 parent_market_title = market_data.market_title
-                print(f"\n✓ 找到分类市场: {parent_market_title}")
+                success(f"找到分类市场: {parent_market_title}")
 
                 if hasattr(market_data, 'child_markets') and market_data.child_markets and len(market_data.child_markets) > 0:
                     child_markets = market_data.child_markets
@@ -8313,19 +8306,18 @@ class OpinionSDKTrader:
                         print(f"  {idx}. [{child_id}] {title}")
                     print(f"  0. 返回")
 
-                    choice_input = input(
-                        f"\n请选择子市场 (0-{len(child_markets)}): ").strip()
+                    choice_input = ask(f"\n请选择子市场 (0-{len(child_markets)}): ")
                     if not choice_input or choice_input == '0':
                         return
 
                     try:
                         choice = int(choice_input)
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                         return
 
                     if choice < 1 or choice > len(child_markets):
-                        print("✗ 无效的选择")
+                        error("无效的选择")
                         return
 
                     selected_child = child_markets[choice - 1]
@@ -8333,7 +8325,7 @@ class OpinionSDKTrader:
 
                     detail_response = client.get_market(market_id=market_id)
                     if detail_response.errno != 0 or not detail_response.result or not detail_response.result.data:
-                        print(f"✗ 获取子市场详细信息失败")
+                        error(f"获取子市场详细信息失败")
                         return
 
                     market_data = detail_response.result.data
@@ -8343,14 +8335,14 @@ class OpinionSDKTrader:
                 market_response = client.get_market(market_id=market_id)
 
                 if market_response.errno != 0 or not market_response.result or not market_response.result.data:
-                    print(f"✗ 市场 {market_id} 不存在")
+                    error(f"市场 {market_id} 不存在")
                     return
 
                 market_data = market_response.result.data
-                print(f"\n✓ 找到二元市场: {market_data.market_title}")
+                success(f"找到二元市场: {market_data.market_title}")
 
         except Exception as e:
-            print(f"✗ 获取市场信息失败: {e}")
+            error(f"获取市场信息失败: {e}")
             return
 
         # 选择交易方向
@@ -8358,7 +8350,7 @@ class OpinionSDKTrader:
         print(f"  1. YES")
         print(f"  2. NO")
         print(f"  0. 返回")
-        side_choice = input("请输入选项 (0-2): ").strip()
+        side_choice = ask("请选择 (0-2)")
 
         if side_choice == '0' or not side_choice:
             return
@@ -8369,30 +8361,28 @@ class OpinionSDKTrader:
             token_id = market_data.no_token_id
             selected_token_name = "NO"
         else:
-            print("✗ 无效选择")
+            error("无效选择")
             return
 
-        print(f"\n✓ 已选择: {selected_token_name}")
+        success(f"已选择: {selected_token_name}")
 
         # 先查询所有账户余额
-        print(f"\n{'='*60}")
-        print(f"{'查询账户余额':^60}")
-        print(f"{'='*60}")
+        section("查询账户余额")
         # display_account_balances 使用 1-based 索引
         all_indices = list(range(1, len(self.clients) + 1))
         all_balances = self.display_account_balances(all_indices)
 
         # 选择账户
         print(f"\n  输入格式示例: 留空=全部, 1,2,3 或 1-3")
-        account_input = input(f"\n请选择账户 (留空=全部): ").strip()
+        account_input = ask(f"请选择账户 (留空=全部): ")
         selected_indices = self.parse_account_selection(
             account_input, len(self.clients))
 
         if not selected_indices:
-            print("✗ 未选择任何账户")
+            error("未选择任何账户")
             return
 
-        print(f"✓ 已选择 {len(selected_indices)} 个账户")
+        success(f"已选择 {len(selected_indices)} 个账户")
 
         # 查询当前盘口价格
         print(f"\n正在获取当前盘口...")
@@ -8405,7 +8395,7 @@ class OpinionSDKTrader:
         else:
             ask1_price = 0
             bid1_price = 0
-            print("  [!] 获取盘口失败，将使用实时价格")
+            warning("获取盘口失败，将使用实时价格")
 
         # 从之前查询的余额中提取选中账户的余额
         account_balances = {}
@@ -8431,23 +8421,23 @@ class OpinionSDKTrader:
         # ===== 设置买入参数 =====
         buy_config = None
         if total_buys > 0:
-            print(f"\n{'='*60}")
+            console.print()
             print(f"设置买入参数 (共{total_buys}次买入)")
-            print(f"{'='*60}")
+            divider("═")
 
             # 金额设置
             print("\n金额设置:")
             print("  1. 总金额 (随机分配到各次)")
             print("  2. 单次金额 (每次相同，×1.01-1.10随机)")
-            buy_amount_mode = input("请选择 (1/2): ").strip()
+            buy_amount_mode = ask("请选择 (1/2)")
 
             if buy_amount_mode == '1':
                 while True:
                     try:
-                        total_amount = float(
-                            input(f"请输入总金额 (最大可用: ${min_balance:.2f}): ").strip())
+                        total_amount = ask_float(
+                            f"请输入总金额 (最大: ${min_balance:.2f})")
                         if total_amount <= 0:
-                            print("✗ 金额必须大于0")
+                            error("金额必须大于0")
                             continue
                         if total_amount > min_balance:
                             print(
@@ -8456,15 +8446,15 @@ class OpinionSDKTrader:
                             continue
                         break
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                 buy_config = {'mode': 'total',
                               'total_amount': total_amount, 'count': total_buys}
             else:
                 while True:
                     try:
-                        single_amount = float(input("请输入单次金额 ($): ").strip())
+                        single_amount = ask_float("请输入单次金额 ($): ")
                         if single_amount <= 0:
-                            print("✗ 金额必须大于0")
+                            error("金额必须大于0")
                             continue
                         # 检查总金额是否超过余额
                         estimated_total = single_amount * total_buys * 1.10  # 最大可能
@@ -8475,7 +8465,7 @@ class OpinionSDKTrader:
                             continue
                         break
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                 buy_config = {'mode': 'single',
                               'single_amount': single_amount, 'count': total_buys}
 
@@ -8484,34 +8474,33 @@ class OpinionSDKTrader:
             print(f"  1. 卖1价 (当前约 {self.format_price(ask1_price)}¢，立即成交)")
             print("  2. 固定价格")
             print("  3. 价格区间 (随机)")
-            buy_price_mode = input("请选择 (1/2/3): ").strip()
+            buy_price_mode = ask("请选择 (1/2/3)")
 
             if buy_price_mode == '2':
                 while True:
                     try:
-                        fixed_price = float(
-                            input("请输入固定价格 (0-1，如0.995): ").strip())
+                        fixed_price = ask_float("请输入固定价格 (0-1)")
                         if not 0 < fixed_price < 1:
-                            print("✗ 价格必须在0-1之间")
+                            error("价格必须在0-1之间")
                             continue
                         break
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                 buy_config['price_mode'] = 'fixed'
                 buy_config['price'] = fixed_price
             elif buy_price_mode == '3':
                 while True:
                     try:
-                        price_range = input("请输入价格区间 (如 0.99-0.995): ").strip()
+                        price_range = ask("请输入价格区间 (如 0.99-0.995)")
                         parts = price_range.split('-')
                         min_price = float(parts[0])
                         max_price = float(parts[1])
                         if not (0 < min_price < max_price < 1):
-                            print("✗ 价格必须在0-1之间且最小值<最大值")
+                            error("价格必须在0-1之间且最小值<最大值")
                             continue
                         break
                     except Exception:
-                        print("✗ 格式错误，请输入如 0.99-0.995")
+                        error("格式错误，请输入如 0.99-0.995")
                 buy_config['price_mode'] = 'range'
                 buy_config['price_min'] = min_price
                 buy_config['price_max'] = max_price
@@ -8521,16 +8510,16 @@ class OpinionSDKTrader:
         # ===== 设置卖出参数 =====
         sell_config = None
         if total_sells > 0:
-            print(f"\n{'='*60}")
+            console.print()
             print(f"设置卖出参数 (共{total_sells}次卖出)")
-            print(f"{'='*60}")
+            divider("═")
 
             # 份额设置
             print("\n份额设置:")
             print("  1. 全部持仓 (随机分配，最后一次卖剩余)")
             print("  2. 总份额 (随机分配，最后一次卖剩余)")
             print("  3. 单次份额 (每次相同，×1.01-1.10随机)")
-            sell_amount_mode = input("请选择 (1/2/3): ").strip()
+            sell_amount_mode = ask("请选择 (1/2/3)")
 
             if sell_amount_mode == '2':
                 # 检查持仓
@@ -8538,17 +8527,16 @@ class OpinionSDKTrader:
                                    ) if account_positions else 0
                 while True:
                     try:
-                        total_shares = int(
-                            input(f"请输入总份额 (最大可用: {min_position}): ").strip())
+                        total_shares = ask_int(f"请输入总份额 (最大: {min_position})")
                         if total_shares <= 0:
-                            print("✗ 份额必须大于0")
+                            error("份额必须大于0")
                             continue
                         if total_shares > min_position:
-                            print(f"✗ 超过可用持仓 {min_position}，请重新输入")
+                            error(f"超过可用持仓 {min_position}，请重新输入")
                             continue
                         break
                     except ValueError:
-                        print("✗ 请输入有效的整数")
+                        error("请输入有效的整数")
                 sell_config = {'mode': 'total',
                                'total_shares': total_shares, 'count': total_sells}
             elif sell_amount_mode == '3':
@@ -8556,9 +8544,9 @@ class OpinionSDKTrader:
                                    ) if account_positions else 0
                 while True:
                     try:
-                        single_shares = int(input("请输入单次份额: ").strip())
+                        single_shares = ask_int("请输入单次份额: ")
                         if single_shares <= 0:
-                            print("✗ 份额必须大于0")
+                            error("份额必须大于0")
                             continue
                         # 检查总份额是否超过持仓
                         estimated_total = int(
@@ -8570,7 +8558,7 @@ class OpinionSDKTrader:
                             continue
                         break
                     except ValueError:
-                        print("✗ 请输入有效的整数")
+                        error("请输入有效的整数")
                 sell_config = {
                     'mode': 'single', 'single_shares': single_shares, 'count': total_sells}
             else:
@@ -8581,34 +8569,33 @@ class OpinionSDKTrader:
             print(f"  1. 买1价 (当前约 {self.format_price(bid1_price)}¢，立即成交)")
             print("  2. 固定价格")
             print("  3. 价格区间 (随机)")
-            sell_price_mode = input("请选择 (1/2/3): ").strip()
+            sell_price_mode = ask("请选择 (1/2/3)")
 
             if sell_price_mode == '2':
                 while True:
                     try:
-                        fixed_price = float(
-                            input("请输入固定价格 (0-1，如0.99): ").strip())
+                        fixed_price = ask_float("请输入固定价格 (0-1)")
                         if not 0 < fixed_price < 1:
-                            print("✗ 价格必须在0-1之间")
+                            error("价格必须在0-1之间")
                             continue
                         break
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                 sell_config['price_mode'] = 'fixed'
                 sell_config['price'] = fixed_price
             elif sell_price_mode == '3':
                 while True:
                     try:
-                        price_range = input("请输入价格区间 (如 0.985-0.99): ").strip()
+                        price_range = ask("请输入价格区间 (如 0.985-0.99)")
                         parts = price_range.split('-')
                         min_price = float(parts[0])
                         max_price = float(parts[1])
                         if not (0 < min_price < max_price < 1):
-                            print("✗ 价格必须在0-1之间且最小值<最大值")
+                            error("价格必须在0-1之间且最小值<最大值")
                             continue
                         break
                     except Exception:
-                        print("✗ 格式错误，请输入如 0.985-0.99")
+                        error("格式错误，请输入如 0.985-0.99")
                 sell_config['price_mode'] = 'range'
                 sell_config['price_min'] = min_price
                 sell_config['price_max'] = max_price
@@ -8616,9 +8603,7 @@ class OpinionSDKTrader:
                 sell_config['price_mode'] = 'market'
 
         # ===== 确认信息 =====
-        print(f"\n{'='*60}")
-        print(f"{'【自定义策略确认】':^60}")
-        print(f"{'='*60}")
+        section("【自定义策略确认】")
         print(f"  市场: {market_data.market_title}")
         print(f"  方向: {selected_token_name}")
         print(f"  账户: {len(selected_indices)}个")
@@ -8660,11 +8645,11 @@ class OpinionSDKTrader:
                 print(
                     f"    价格: {self.format_price(sell_config['price_min'])}¢ - {self.format_price(sell_config['price_max'])}¢")
 
-        print(f"{'='*60}")
+        divider("═")
 
-        confirm = input("\n确认无误请输入 'done': ").strip().lower()
+        confirm = ask("确认无误请输入 'done': ").lower()
         if confirm != 'done':
-            print("✗ 已取消")
+            error("已取消")
             return
 
         # 执行自定义策略
@@ -8684,9 +8669,7 @@ class OpinionSDKTrader:
         import threading
         import random
 
-        print(f"\n{'='*60}")
-        print(f"{'执行自定义策略':^60}")
-        print(f"{'='*60}")
+        section("执行自定义策略")
 
         # 计算买入金额计划
         buy_amounts = []
@@ -8696,7 +8679,7 @@ class OpinionSDKTrader:
                 # 总金额随机分配
                 total = buy_config['total_amount']
                 if total_buys <= 0:
-                    print("✗ 买入次数必须大于0")
+                    error("买入次数必须大于0")
                     return False, {}
                 avg = total / total_buys
                 remaining = total
@@ -8852,9 +8835,7 @@ class OpinionSDKTrader:
                 print(f"\n等待2秒后执行下一步...")
                 time.sleep(2)
 
-        print(f"\n{'='*60}")
-        print(f"{'自定义策略执行完成':^60}")
-        print(f"{'='*60}")
+        section("自定义策略执行完成")
 
     def _execute_buy_v2(self, client, config, market_id, token_id, amount, price, op_num):
         """执行买入V2"""
@@ -8865,7 +8846,7 @@ class OpinionSDKTrader:
                 if ob['success'] and ob['ask1_price'] > 0:
                     price = ob['ask1_price']
                 else:
-                    print(f"[{config.remark}] ✗ 买入#{op_num}: 无卖单")
+                    error(f"[{config.remark}] 买入#{op_num}: 无卖单")
                     return
 
             price_str = f"{price:.6f}"
@@ -8886,18 +8867,18 @@ class OpinionSDKTrader:
                 print(
                     f"[{config.remark}] ✓ 买入#{op_num}: ${amount:.2f} @ {price_display}")
             elif result.errno == 10403:
-                print(f"[{config.remark}] ✗ 买入#{op_num}: 地区限制")
+                error(f"[{config.remark}] 买入#{op_num}: 地区限制")
             else:
                 print(
                     f"[{config.remark}] ✗ 买入#{op_num}: {self.translate_error(result.errmsg)}")
         except Exception as e:
-            print(f"[{config.remark}] ✗ 买入#{op_num}: {self.translate_error(str(e))}")
+            error(f"[{config.remark}] 买入#{op_num}: {self.translate_error(str(e))}")
 
     def _execute_sell_v2(self, client, config, market_id, token_id, shares, price, op_num):
         """执行卖出V2"""
         try:
             if shares <= 0:
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: 份额为0，跳过")
+                error(f"[{config.remark}] 卖出#{op_num}: 份额为0，跳过")
                 return
 
             if price is None:
@@ -8906,7 +8887,7 @@ class OpinionSDKTrader:
                 if ob['success'] and ob['bid1_price'] > 0:
                     price = ob['bid1_price']
                 else:
-                    print(f"[{config.remark}] ✗ 卖出#{op_num}: 无买单")
+                    error(f"[{config.remark}] 卖出#{op_num}: 无买单")
                     return
 
             price_str = f"{price:.6f}"
@@ -8927,14 +8908,14 @@ class OpinionSDKTrader:
                 print(
                     f"[{config.remark}] ✓ 卖出#{op_num}: {shares}份 @ {price_display}")
             elif result.errno == 10403:
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: 地区限制")
+                error(f"[{config.remark}] 卖出#{op_num}: 地区限制")
             else:
                 error_msg = self.translate_error(result.errmsg)
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: {error_msg}")
+                error(f"[{config.remark}] 卖出#{op_num}: {error_msg}")
                 if error_msg == "余额不足":
                     print(f"[{config.remark}]    [*] 提示: 可能有挂单锁定了部分份额，建议先撤销挂单")
         except Exception as e:
-            print(f"[{config.remark}] ✗ 卖出#{op_num}: {self.translate_error(str(e))}")
+            error(f"[{config.remark}] 卖出#{op_num}: {self.translate_error(str(e))}")
 
     def _execute_single_buy(self, client, config, market_id, token_id, amount, op_num):
         """执行单次买入"""
@@ -8942,7 +8923,7 @@ class OpinionSDKTrader:
             # 获取盘口
             ob = OrderbookService.fetch(client, token_id)
             if not ob['success'] or ob['ask1_price'] <= 0:
-                print(f"[{config.remark}] ✗ 买入#{op_num}: 无卖单")
+                error(f"[{config.remark}] 买入#{op_num}: 无卖单")
                 return
 
             price = ob['ask1_price']
@@ -8964,12 +8945,12 @@ class OpinionSDKTrader:
                 print(
                     f"[{config.remark}] ✓ 买入#{op_num}: ${amount:.2f} @ {price_display}")
             elif result.errno == 10403:
-                print(f"[{config.remark}] ✗ 买入#{op_num}: 地区限制")
+                error(f"[{config.remark}] 买入#{op_num}: 地区限制")
             else:
                 print(
                     f"[{config.remark}] ✗ 买入#{op_num}: {self.translate_error(result.errmsg)}")
         except Exception as e:
-            print(f"[{config.remark}] ✗ 买入#{op_num}: {self.translate_error(str(e))}")
+            error(f"[{config.remark}] 买入#{op_num}: {self.translate_error(str(e))}")
 
     def _execute_single_sell(self, client, config, market_id, token_id, amount, op_num):
         """执行单次卖出"""
@@ -8978,13 +8959,13 @@ class OpinionSDKTrader:
             available_shares = PositionService.get_token_balance(
                 client, token_id)
             if available_shares <= 0:
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: 无持仓")
+                error(f"[{config.remark}] 卖出#{op_num}: 无持仓")
                 return
 
             # 获取盘口
             ob = OrderbookService.fetch(client, token_id)
             if not ob['success'] or ob['bid1_price'] <= 0:
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: 无买单")
+                error(f"[{config.remark}] 卖出#{op_num}: 无买单")
                 return
 
             price = ob['bid1_price']
@@ -8999,7 +8980,7 @@ class OpinionSDKTrader:
                 sell_shares = min(int(amount / price), available_shares)
 
             if sell_shares <= 0:
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: 数量为0")
+                error(f"[{config.remark}] 卖出#{op_num}: 数量为0")
                 return
 
             order = PlaceOrderDataInput(
@@ -9017,20 +8998,20 @@ class OpinionSDKTrader:
                 print(
                     f"[{config.remark}] ✓ 卖出#{op_num}: {sell_shares}份 @ {price_display}")
             elif result.errno == 10403:
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: 地区限制")
+                error(f"[{config.remark}] 卖出#{op_num}: 地区限制")
             else:
                 error_msg = self.translate_error(result.errmsg)
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: {error_msg}")
+                error(f"[{config.remark}] 卖出#{op_num}: {error_msg}")
                 if error_msg == "余额不足":
                     print(f"[{config.remark}]    [*] 提示: 可能有挂单锁定了部分份额，建议先撤销挂单")
         except Exception as e:
-            print(f"[{config.remark}] ✗ 卖出#{op_num}: {self.translate_error(str(e))}")
+            error(f"[{config.remark}] 卖出#{op_num}: {self.translate_error(str(e))}")
 
     def _execute_single_sell_shares(self, client, config, market_id, token_id, sell_shares, is_x_mode, op_num):
         """执行单次卖出（按份额）"""
         try:
             if sell_shares <= 0:
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: 份额为0，跳过")
+                error(f"[{config.remark}] 卖出#{op_num}: 份额为0，跳过")
                 return
 
             # 获取盘口
@@ -9057,50 +9038,40 @@ class OpinionSDKTrader:
                         print(
                             f"[{config.remark}] ✓ 卖出#{op_num}: {sell_shares}份 @ {price_display}")
                     elif result.errno == 10403:
-                        print(f"[{config.remark}] ✗ 卖出#{op_num}: 地区限制")
+                        error(f"[{config.remark}] 卖出#{op_num}: 地区限制")
                     else:
                         error_msg = self.translate_error(result.errmsg)
-                        print(f"[{config.remark}] ✗ 卖出#{op_num}: {error_msg}")
+                        error(f"[{config.remark}] 卖出#{op_num}: {error_msg}")
                         # 如果是余额不足，提示可能有挂单
                         if error_msg == "余额不足":
                             print(
                                 f"[{config.remark}]    [*] 提示: 可能有挂单锁定了部分份额，建议先撤销挂单")
                 else:
-                    print(f"[{config.remark}] ✗ 卖出#{op_num}: 无买单")
+                    error(f"[{config.remark}] 卖出#{op_num}: 无买单")
             else:
-                print(f"[{config.remark}] ✗ 卖出#{op_num}: 获取盘口失败")
+                error(f"[{config.remark}] 卖出#{op_num}: 获取盘口失败")
         except Exception as e:
-            print(f"[{config.remark}] ✗ 卖出#{op_num}: {self.translate_error(str(e))}")
+            error(f"[{config.remark}] 卖出#{op_num}: {self.translate_error(str(e))}")
 
     def merge_split_menu(self):
         """合并/拆分菜单"""
-        print(f"\n{'='*60}")
-        print(f"{'合并/拆分':^60}")
-        print(f"{'='*60}")
-        print("说明:")
-        print("  合并(Merge): YES + NO → USDT")
-        print("  拆分(Split): USDT → YES + NO")
-        print(f"{'─'*60}")
-        print("  1. 拆分 (USDT → YES + NO)")
-        print("  2. 合并 (YES + NO → USDT)")
-        print("  0. 返回主菜单")
+        section("合并/拆分")
+        dim("合并(Merge): YES + NO → USDT")
+        dim("拆分(Split): USDT → YES + NO")
 
-        choice = input("\n请选择 (0-2): ").strip()
+        choice = select("请选择操作:", [
+            ("🔀 拆分 (USDT → YES + NO)", "split"),
+            ("🔄 合并 (YES + NO → USDT)", "merge"),
+        ])
 
-        if choice == '0' or not choice:
-            return
-        elif choice == '1':
+        if choice == "split":
             self.split_menu()
-        elif choice == '2':
+        elif choice == "merge":
             self.merge_menu()
-        else:
-            print("✗ 无效选择")
 
     def split_menu(self):
         """拆分操作菜单"""
-        print(f"\n{'='*60}")
-        print(f"{'拆分 (USDT → YES + NO)':^60}")
-        print(f"{'='*60}")
+        section("拆分 (USDT → YES + NO)")
 
         # 1. 选择账户（支持多选，默认全部）
         print("\n请选择账户:")
@@ -9108,7 +9079,7 @@ class OpinionSDKTrader:
             print(f"  {idx}. {config.remark}")
         print("  0. 返回")
 
-        account_choice = input(f"\n请选择账户 (留空=全部, 支持多选如 1 3 5 或 1-5): ").strip()
+        account_choice = ask(f"请选择账户 (留空=全部, 支持多选如 1 3 5 或 1-5): ")
         if account_choice == '0':
             return
 
@@ -9116,10 +9087,10 @@ class OpinionSDKTrader:
         selected_indices = self.parse_account_selection(
             account_choice, len(self.configs))
         if not selected_indices:
-            print("✗ 未选择任何账户")
+            error("未选择任何账户")
             return
 
-        print(f"\n✓ 已选择 {len(selected_indices)} 个账户")
+        success(f"已选择 {len(selected_indices)} 个账户")
 
         # 2. 输入市场ID（使用新的提示方法）
         market_id = self.prompt_market_id("请输入市场ID")
@@ -9131,45 +9102,45 @@ class OpinionSDKTrader:
         try:
             market_response = client.get_market(market_id=market_id)
             if market_response.errno != 0 or not market_response.result or not market_response.result.data:
-                print(f"✗ 市场 {market_id} 不存在")
+                error(f"市场 {market_id} 不存在")
                 return
 
             market_data = market_response.result.data
-            print(f"\n✓ 市场: {market_data.market_title}")
+            success(f"市场: {market_data.market_title}")
             print(f"  YES Token: {market_data.yes_token_id}")
             print(f"  NO Token: {market_data.no_token_id}")
 
         except Exception as e:
-            print(f"✗ 获取市场信息失败: {e}")
+            error(f"获取市场信息失败: {e}")
             return
 
         # 4. 输入拆分金额
         while True:
-            amount_input = input("\n请输入每个账户的拆分金额 ($，留空返回): ").strip()
+            amount_input = ask("请输入每个账户的拆分金额 ($，留空返回): ")
             if not amount_input:
                 return
             try:
                 split_amount = float(amount_input)
                 if split_amount <= 0:
-                    print("✗ 金额必须大于0")
+                    error("金额必须大于0")
                     continue
                 break
             except ValueError:
-                print("✗ 请输入有效的数字")
+                error("请输入有效的数字")
 
         # 5. 确认
-        print(f"\n{'─'*40}")
+        divider(width=40)
         print(f"确认拆分:")
         print(f"  账户数: {len(selected_indices)} 个")
         print(f"  市场: {market_data.market_title}")
         print(f"  每账户金额: ${split_amount:.2f}")
         print(f"  总金额: ${split_amount * len(selected_indices):.2f}")
         print(f"  每账户将获得: {int(split_amount)} YES + {int(split_amount)} NO")
-        print(f"{'─'*40}")
+        divider()
 
-        confirm = input("确认请输入 'yes': ").strip().lower()
-        if confirm != 'yes':
-            print("✗ 已取消")
+        ok = confirm("确认执行此操作?")
+        if not ok:
+            error("已取消")
             return
 
         # 6. 批量执行拆分
@@ -9184,15 +9155,21 @@ class OpinionSDKTrader:
             result = MergeSplitService.split(client, market_id, split_amount)
 
             if result['success']:
-                print(f"  ✓ 拆分成功!")
+                tx_hash = result.get('tx_hash', '')
+                if tx_hash:
+                    success(f"拆分成功! tx: {tx_hash[:20]}...")
+                else:
+                    success(f"拆分成功!")
+                if result.get('warning'):
+                    warning(f"警告: {result['warning'][:80]}")
                 success_count += 1
             else:
-                print(f"  ✗ 拆分失败: {result.get('error', '未知错误')}")
+                error(f"拆分失败: {result.get('error', '未知错误')}")
                 fail_count += 1
 
-        print(f"\n{'─'*40}")
+        divider(width=40)
         print(f"拆分完成: 成功 {success_count}, 失败 {fail_count}")
-        print(f"{'─'*40}")
+        divider()
 
         # 7. 拆分完成后询问是否卖出
         if success_count > 0:
@@ -9203,7 +9180,7 @@ class OpinionSDKTrader:
             print(f"  2. 卖出 NO")
             print(f"  3. 不卖出")
 
-            sell_side_choice = input("请选择 (1-3): ").strip()
+            sell_side_choice = ask("请选择 (1-3)")
 
             if sell_side_choice == '1':
                 token_id = market_data.yes_token_id
@@ -9212,14 +9189,14 @@ class OpinionSDKTrader:
                 token_id = market_data.no_token_id
                 token_name = "NO"
             else:
-                print("✓ 拆分完成，未执行卖出")
+                success("拆分完成，未执行卖出")
                 return
 
             # 获取订单簿（使用第一个账户）
             client = self.clients[selected_indices[0] - 1]
             ob = OrderbookService.fetch(client, token_id)
             if not ob['success']:
-                print(f"✗ 获取订单簿失败，无法卖出")
+                error(f"获取订单簿失败，无法卖出")
                 return
 
             bid1_price = ob['bid1_price']
@@ -9231,7 +9208,7 @@ class OpinionSDKTrader:
             )
 
             if action == 'skip' or sell_price is None:
-                print("✓ 拆分完成，未执行卖出")
+                success("拆分完成，未执行卖出")
                 return
 
             # 批量执行卖出
@@ -9268,9 +9245,7 @@ class OpinionSDKTrader:
 
     def merge_menu(self):
         """合并操作菜单"""
-        print(f"\n{'='*60}")
-        print(f"{'合并 (YES + NO → USDT)':^60}")
-        print(f"{'='*60}")
+        section("合并 (YES + NO → USDT)")
 
         # 1. 选择账户
         print("\n请选择账户:")
@@ -9278,43 +9253,43 @@ class OpinionSDKTrader:
             print(f"  {idx}. {config.remark}")
         print("  0. 返回")
 
-        account_choice = input(f"\n请选择账户 (1-{len(self.configs)}): ").strip()
+        account_choice = ask(f"请选择账户 (1-{len(self.configs)}): ")
         if account_choice == '0' or not account_choice:
             return
 
         try:
             account_idx = int(account_choice)
             if account_idx < 1 or account_idx > len(self.clients):
-                print("✗ 无效的账户选择")
+                error("无效的账户选择")
                 return
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         client = self.clients[account_idx - 1]
         config = self.configs[account_idx - 1]
-        print(f"\n✓ 已选择: {config.remark}")
+        success(f"已选择: {config.remark}")
 
         # 2. 输入市场ID
-        market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+        market_id_input = ask("请输入市场ID")
         if not market_id_input:
             return
 
         try:
             market_id = int(market_id_input)
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         # 3. 获取市场信息和持仓
         try:
             market_response = client.get_market(market_id=market_id)
             if market_response.errno != 0 or not market_response.result or not market_response.result.data:
-                print(f"✗ 市场 {market_id} 不存在")
+                error(f"市场 {market_id} 不存在")
                 return
 
             market_data = market_response.result.data
-            print(f"\n✓ 市场: {market_data.market_title}")
+            success(f"市场: {market_data.market_title}")
 
             # 查询YES和NO的持仓
             positions_response = client.get_my_positions()
@@ -9338,45 +9313,45 @@ class OpinionSDKTrader:
             # 可合并数量 = min(YES, NO)
             max_merge = min(yes_shares, no_shares)
             if max_merge <= 0:
-                print(f"\n✗ 无法合并: 需要同时持有 YES 和 NO")
+                error(f"无法合并: 需要同时持有 YES 和 NO")
                 return
 
             print(f"  可合并: {max_merge} 份 (将获得 ${max_merge:.2f} USDT)")
 
         except Exception as e:
-            print(f"✗ 获取信息失败: {e}")
+            error(f"获取信息失败: {e}")
             return
 
         # 4. 输入合并数量
         while True:
-            shares_input = input(f"\n请输入合并数量 (最多{max_merge}，留空=全部): ").strip()
+            shares_input = ask(f"请输入合并数量 (最多{max_merge}，留空=全部): ")
             if not shares_input:
                 merge_shares = max_merge
                 break
             try:
                 merge_shares = int(shares_input)
                 if merge_shares <= 0:
-                    print("✗ 数量必须大于0")
+                    error("数量必须大于0")
                     continue
                 if merge_shares > max_merge:
-                    print(f"✗ 超过可合并数量 ({max_merge})")
+                    error(f"超过可合并数量 ({max_merge})")
                     continue
                 break
             except ValueError:
-                print("✗ 请输入有效的整数")
+                error("请输入有效的整数")
 
         # 5. 确认
-        print(f"\n{'─'*40}")
+        divider(width=40)
         print(f"确认合并:")
         print(f"  账户: {config.remark}")
         print(f"  市场: {market_data.market_title}")
         print(f"  合并数量: {merge_shares} 份")
         print(f"  将获得: ${merge_shares:.2f} USDT")
-        print(f"{'─'*40}")
+        divider()
 
-        confirm = input("确认请输入 'yes': ").strip().lower()
-        if confirm != 'yes':
-            print("✗ 已取消")
+        ok = confirm("确认执行此操作?")
+        if not ok:
+            error("已取消")
             return
 
         # 6. 执行合并
@@ -9384,11 +9359,11 @@ class OpinionSDKTrader:
         result = MergeSplitService.merge(client, market_id, merge_shares)
 
         if result['success']:
-            print(f"✓ 合并成功! 获得 ${merge_shares:.2f} USDT")
+            success(f"合并成功! 获得 ${merge_shares:.2f} USDT")
             if result.get('tx_hash'):
                 print(f"  交易哈希: {result['tx_hash'][:20]}...")
         else:
-            print(f"✗ 合并失败: {result.get('error', '未知错误')}")
+            error(f"合并失败: {result.get('error', '未知错误')}")
 
     def enhanced_trading_menu(self, selected_account_indices: list):
         """增强买卖菜单
@@ -9399,24 +9374,22 @@ class OpinionSDKTrader:
         - 交易汇总统计
         - 使用 OrderbookManager 管理订单簿
         """
-        print(f"\n{'='*60}")
-        print(f"{'增强买卖模式':^60}")
-        print(f"{'='*60}")
+        section("增强买卖模式")
         print("说明:")
         print("  - 支持按金额/仓位下单")
         print("  - 卖出时跳过余额检查")
         print("  - 自动输出交易汇总统计")
-        print(f"{'─'*60}")
+        divider()
 
         # 1. 输入市场ID
-        market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+        market_id_input = ask("请输入市场ID")
         if not market_id_input:
             return
 
         try:
             market_id = int(market_id_input)
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         # 2. 获取市场信息
@@ -9433,45 +9406,44 @@ class OpinionSDKTrader:
                 market_data = categorical_response.result.data
                 if hasattr(market_data, 'child_markets') and market_data.child_markets and len(market_data.child_markets) > 0:
                     child_markets = market_data.child_markets
-                    print(f"\n✓ 找到分类市场: {market_data.market_title}")
+                    success(f"找到分类市场: {market_data.market_title}")
                     print(f"\n子市场列表:")
                     for idx, child in enumerate(child_markets, 1):
                         print(f"  {idx}. {child.market_title}")
                     print("  0. 返回")
 
-                    choice_input = input(
-                        f"\n请选择子市场 (0-{len(child_markets)}): ").strip()
+                    choice_input = ask(f"\n请选择子市场 (0-{len(child_markets)}): ")
                     if not choice_input or choice_input == '0':
                         return
 
                     try:
                         choice = int(choice_input)
                         if choice < 1 or choice > len(child_markets):
-                            print("✗ 无效选择")
+                            error("无效选择")
                             return
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                         return
 
                     selected_child = child_markets[choice - 1]
                     market_id = selected_child.market_id
                     detail_response = client.get_market(market_id=market_id)
                     if detail_response.errno != 0:
-                        print(f"✗ 获取子市场信息失败")
+                        error(f"获取子市场信息失败")
                         return
                     market_data = detail_response.result.data
                 else:
-                    print(f"\n✓ 市场: {market_data.market_title}")
+                    success(f"市场: {market_data.market_title}")
             else:
                 market_response = client.get_market(market_id=market_id)
                 if market_response.errno != 0 or not market_response.result or not market_response.result.data:
-                    print(f"✗ 市场 {market_id} 不存在")
+                    error(f"市场 {market_id} 不存在")
                     return
                 market_data = market_response.result.data
-                print(f"\n✓ 市场: {market_data.market_title}")
+                success(f"市场: {market_data.market_title}")
 
         except Exception as e:
-            print(f"✗ 获取市场信息失败: {e}")
+            error(f"获取市场信息失败: {e}")
             return
 
         # 3. 选择交易方向
@@ -9480,7 +9452,7 @@ class OpinionSDKTrader:
         print("  2. NO")
         print("  0. 返回")
 
-        side_choice = input("请选择 (0-2): ").strip()
+        side_choice = ask("请选择 (0-2)")
         if side_choice == '0' or not side_choice:
             return
         elif side_choice == '1':
@@ -9490,16 +9462,16 @@ class OpinionSDKTrader:
             token_id = market_data.no_token_id
             token_name = "NO"
         else:
-            print("✗ 无效选择")
+            error("无效选择")
             return
 
-        print(f"\n✓ 已选择: {token_name} (Token: {token_id})")
+        success(f"已选择: {token_name} (Token: {token_id})")
 
         # 4. 初始化订单簿管理器（主动查询 + WS 兜底）
         print(f"\n正在初始化订单簿...")
         ob_manager = OrderbookManager(client, token_id, ws_timeout=10)
         if not ob_manager.start():
-            print("✗ 订单簿初始化失败")
+            error("订单簿初始化失败")
             return
 
         # 5. 显示当前盘口
@@ -9515,7 +9487,7 @@ class OpinionSDKTrader:
         summary = TradeSummary()  # 交易汇总
 
         while True:
-            print(f"\n{'─'*40}")
+            divider(width=40)
             print("操作选择:")
             print("  1. 买入")
             print("  2. 卖出")
@@ -9523,7 +9495,7 @@ class OpinionSDKTrader:
             print("  4. 查看交易汇总")
             print("  0. 结束并返回")
 
-            action_choice = input("请选择 (0-4): ").strip()
+            action_choice = ask("请选择 (0-4)")
 
             if action_choice == '0':
                 break
@@ -9541,7 +9513,7 @@ class OpinionSDKTrader:
                 summary.print_summary("当前交易汇总")
                 continue
             elif action_choice not in ['1', '2']:
-                print("✗ 无效选择")
+                error("无效选择")
                 continue
 
             is_buy = (action_choice == '1')
@@ -9561,14 +9533,14 @@ class OpinionSDKTrader:
                 # 买入用卖1价
                 price = ob_state.ask1_price
                 if price <= 0:
-                    print("✗ 卖盘为空，无法买入")
+                    error("卖盘为空，无法买入")
                     continue
                 print(f"\n将以卖1价 {self.format_price(price)}¢ 买入")
             else:
                 # 卖出用买1价
                 price = ob_state.bid1_price
                 if price <= 0:
-                    print("✗ 买盘为空，无法卖出")
+                    error("买盘为空，无法卖出")
                     continue
                 print(f"\n将以买1价 {self.format_price(price)}¢ 卖出")
 
@@ -9630,7 +9602,7 @@ class OpinionSDKTrader:
                 print(f"  {order_shares} 份 → 约 ${order_amount:.2f}")
 
             if order_shares <= 0:
-                print("✗ 计算份额为0，无法下单")
+                error("计算份额为0，无法下单")
                 continue
 
             # 确认
@@ -9639,9 +9611,9 @@ class OpinionSDKTrader:
             print(f"  数量: {order_shares} 份")
             print(f"  金额: ${order_amount:.2f}")
 
-            confirm = input("确认请输入 'y': ").strip().lower()
+            confirm = ask("确认请输入 'y'").lower()
             if confirm != 'y':
-                print("✗ 已取消")
+                error("已取消")
                 continue
 
             # 执行下单
@@ -9695,51 +9667,29 @@ class OpinionSDKTrader:
         if summary.total_trades > 0:
             summary.print_summary("本轮交易汇总")
 
-        print("\n✓ 增强买卖模式结束")
+        success("增强买卖模式结束")
 
     def trading_menu(self):
         """交易菜单"""
-        # 1. 先选择交易模式
-        print(f"\n{'='*60}")
-        print(f"{'交易模式选择':^60}")
-        print(f"{'='*60}")
-        print("  1. 仅买入")
-        print("  2. 仅卖出")
-        print("  3. 先买后卖")
-        print("  4. 先卖后买")
-        print("  5. 自定义策略")
-        print("  6. 快速模式（买卖交替）")
-        print("  7. 低损耗模式（先买后挂单）")
-        print("  8. 挂单模式（自定义价格）")
-        print("  9. 做市商模式（双边挂单+分层）")
-        print("  10. 增强买卖（按金额/仓位+交易汇总）")
-        print("  0. 返回主菜单")
+        section("交易模式")
 
-        mode_choice = input("\n请选择交易模式 (0-10): ").strip()
+        trade_mode = select("请选择交易模式:", [
+            ("🟢 仅买入", "buy_only"),
+            ("🔴 仅卖出", "sell_only"),
+            ("🔄 先买后卖", "buy_then_sell"),
+            ("↩️  先卖后买", "sell_then_buy"),
+            ("⚙️  自定义策略", "custom"),
+            "---",
+            ("⚡ 快速模式（买卖交替）", "quick_mode"),
+            ("📉 低损耗模式（先买后挂单）", "low_loss_mode"),
+            ("📊 挂单模式（自定义价格）", "limit_order_mode"),
+            ("🏦 做市商模式（双边挂单）", "market_maker_mode"),
+            ("💹 增强买卖（金额/仓位）", "enhanced_mode"),
+        ])
 
-        if mode_choice == '0':
-            return
-        elif mode_choice not in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']:
-            print("✗ 无效选择")
+        if trade_mode is None:
             return
 
-        # 映射模式
-        mode_map = {
-            '1': 'buy_only',
-            '2': 'sell_only',
-            '3': 'buy_then_sell',
-            '4': 'sell_then_buy',
-            '5': 'custom',
-            '6': 'quick_mode',
-            '7': 'low_loss_mode',
-            '8': 'limit_order_mode',
-            '9': 'market_maker_mode',
-            '10': 'enhanced_mode'
-        }
-
-        trade_mode = mode_map[mode_choice]
-
-        # 显示选择的模式
         mode_names = {
             'buy_only': '仅买入',
             'sell_only': '仅卖出',
@@ -9753,15 +9703,15 @@ class OpinionSDKTrader:
             'enhanced_mode': '增强买卖'
         }
 
-        print(f"\n✓ 已选择: {mode_names[trade_mode]}")
+        success(f"已选择: {mode_names[trade_mode]}")
 
         # 仅卖出模式：询问是卖出指定市场还是卖出所有持仓
         if trade_mode == 'sell_only':
-            print(f"\n{'─'*40}")
+            divider(width=40)
             print("卖出范围选择:")
             print("  1. 卖出指定市场持仓")
             print("  2. 卖出所有持仓（一键清仓）")
-            sell_scope = input("请选择 (1/2): ").strip()
+            sell_scope = ask("请选择 (1/2)")
 
             if sell_scope == '2':
                 # 卖出所有持仓
@@ -9770,14 +9720,14 @@ class OpinionSDKTrader:
 
             # 卖出指定市场：先选择市场，再查询持仓
             # 询问市场ID
-            market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+            market_id_input = ask("请输入市场ID")
             if not market_id_input:
                 return
 
             try:
                 sell_market_id = int(market_id_input)
             except ValueError:
-                print("✗ 请输入有效的数字")
+                error("请输入有效的数字")
                 return
 
             # 获取市场信息
@@ -9792,11 +9742,11 @@ class OpinionSDKTrader:
                 # 这是一个分类市场
                 market_data = categorical_response.result.data
                 if not hasattr(market_data, 'market_title') or not market_data.market_title:
-                    print(f"✗ 市场 {sell_market_id} 数据不完整")
+                    error(f"市场 {sell_market_id} 数据不完整")
                     return
                 parent_market_title = market_data.market_title
                 parent_market_id = market_data.market_id
-                print(f"\n✓ 找到分类市场: {parent_market_title}")
+                success(f"找到分类市场: {parent_market_title}")
 
                 # 检查是否有子市场
                 if hasattr(market_data, 'child_markets') and market_data.child_markets and len(market_data.child_markets) > 0:
@@ -9811,26 +9761,26 @@ class OpinionSDKTrader:
                         print(f"  {idx}. [{child_id}] {title}")
                     print(f"  0. 返回")
 
-                    choice_input = input(
-                        f"\n请选择要卖出的子市场 (0-{len(child_markets)}): ").strip()
+                    choice_input = ask(
+                        f"\n请选择要卖出的子市场 (0-{len(child_markets)}): ")
                     if not choice_input or choice_input == '0':
                         return
 
                     try:
                         choice = int(choice_input)
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                         return
 
                     if choice < 1 or choice > len(child_markets):
-                        print("✗ 无效的选择")
+                        error("无效的选择")
                         return
 
                     selected_child = child_markets[choice - 1]
                     sell_market_id = selected_child.market_id
                     market_title = selected_child.market_title if hasattr(
                         selected_child, 'market_title') else f"市场{sell_market_id}"
-                    print(f"\n✓ 已选择子市场: {market_title}")
+                    success(f"已选择子市场: {market_title}")
                 else:
                     # 分类市场但没有子市场，使用父市场标题
                     market_title = parent_market_title
@@ -9840,17 +9790,15 @@ class OpinionSDKTrader:
                 if detail_response.errno != 0 or not detail_response.result or not detail_response.result.data:
                     error_msg = detail_response.errmsg if hasattr(
                         detail_response, 'errmsg') and detail_response.errmsg else '未知错误'
-                    print(f"✗ 市场不存在或已下架，请检查市场ID ({error_msg})")
+                    error(f"市场不存在或已下架，请检查市场ID ({error_msg})")
                     return
                 market_data = detail_response.result.data
                 market_title = market_data.market_title if hasattr(
                     market_data, 'market_title') else f"市场{sell_market_id}"
-                print(f"\n✓ 找到市场: {market_title}")
+                success(f"找到市场: {market_title}")
 
             # 查询该市场所有账户的持仓（实时显示）
-            print(f"\n{'='*60}")
-            print(f"{'查询市场持仓':^60}")
-            print(f"{'='*60}")
+            section("查询市场持仓")
 
             accounts_with_positions = []  # 有持仓的账户
 
@@ -9918,13 +9866,13 @@ class OpinionSDKTrader:
                                 print(
                                     f"  账户ID:{idx}  备注:{remark}  持仓:{shares}份  方向:{side}")
                 except Exception as e:
-                    print(f"  账户ID:{idx}  备注:{remark}  [!] 查询失败: {e}")
+                    warning(f"账户{{idx}} {{remark}}: 查询失败: {e}")
 
             if not accounts_with_positions:
-                print(f"\n✗ 没有账户在市场 {sell_market_id} 持有仓位")
+                error(f"没有账户在市场 {sell_market_id} 持有仓位")
                 return
 
-            print(f"\n✓ 找到 {len(accounts_with_positions)} 个账户有持仓")
+            success(f"找到 {len(accounts_with_positions)} 个账户有持仓")
 
             # 让用户选择账户
             print(f"\n  输入格式示例:")
@@ -9932,7 +9880,7 @@ class OpinionSDKTrader:
             print(f"    2 9 10 = 通过账户ID选择")
             print(f"    5-15 = 通过ID范围选择")
 
-            account_input = input("\n请选择账户 (留空=全部有持仓账户): ").strip()
+            account_input = ask("请选择账户 (留空=全部有持仓账户): ")
 
             if not account_input:
                 # 默认选择所有有持仓的账户
@@ -9948,10 +9896,10 @@ class OpinionSDKTrader:
                     idx for idx in selected_account_indices if idx in position_indices]
 
             if not selected_account_indices:
-                print("✗ 未选择任何有持仓的账户")
+                error("未选择任何有持仓的账户")
                 return
 
-            print(f"✓ 已选择 {len(selected_account_indices)} 个账户")
+            success(f"已选择 {len(selected_account_indices)} 个账户")
 
             # 直接跳转到卖出流程，传入市场标题和缓存的持仓信息（避免重复查询）
             self._execute_sell_for_market(
@@ -9963,9 +9911,7 @@ class OpinionSDKTrader:
             return
 
         # 2. 先查询所有账户余额
-        print(f"\n{'='*60}")
-        print(f"{'查询账户余额':^60}")
-        print(f"{'='*60}")
+        section("查询账户余额")
         all_indices = list(range(1, len(self.clients) + 1))  # 1-based 索引
         all_account_balances = self.display_account_balances(all_indices)
 
@@ -9975,15 +9921,15 @@ class OpinionSDKTrader:
         print(f"    2 9 10 = 通过账户ID选择")
         print(f"    5-15 = 通过ID范围选择")
 
-        account_input = input("\n请选择账户 (留空=全部): ").strip()
+        account_input = ask("请选择账户 (留空=全部): ")
         selected_account_indices = self.parse_account_selection(
             account_input, len(self.clients))
 
         if not selected_account_indices:
-            print("✗ 未选择任何有效账户")
+            error("未选择任何有效账户")
             return
 
-        print(f"✓ 已选择 {len(selected_account_indices)} 个账户")
+        success(f"已选择 {len(selected_account_indices)} 个账户")
 
         # 自定义策略模式：跳转到专门的菜单
         if trade_mode == 'custom':
@@ -10011,14 +9957,14 @@ class OpinionSDKTrader:
         parent_market_id = None       # 记录父市场ID
 
         # 4. 询问市场ID
-        market_id_input = input("\n请输入市场ID (留空返回): ").strip()
+        market_id_input = ask("请输入市场ID")
         if not market_id_input:
             return
 
         try:
             market_id = int(market_id_input)
         except ValueError:
-            print("✗ 请输入有效的数字")
+            error("请输入有效的数字")
             return
 
         # 2. 获取市场信息
@@ -10035,11 +9981,11 @@ class OpinionSDKTrader:
                 # 这是一个分类市场
                 market_data = categorical_response.result.data
                 if not hasattr(market_data, 'market_title') or not market_data.market_title:
-                    print(f"✗ 市场 {market_id} 数据不完整")
+                    error(f"市场 {market_id} 数据不完整")
                     return
                 parent_market_title = market_data.market_title  # 保存父市场标题
                 parent_market_id = market_data.market_id  # 保存父市场ID
-                print(f"\n✓ 找到分类市场: {parent_market_title}")
+                success(f"找到分类市场: {parent_market_title}")
                 print(f"  市场ID: {parent_market_id}")
 
                 # 检查是否有子市场
@@ -10056,26 +10002,26 @@ class OpinionSDKTrader:
                     print(f"  0. 返回")
 
                     # 让用户选择子市场
-                    choice_input = input(
-                        f"\n请选择要交易的子市场 (0-{len(child_markets)}): ").strip()
+                    choice_input = ask(
+                        f"\n请选择要交易的子市场 (0-{len(child_markets)}): ")
                     if not choice_input or choice_input == '0':
                         return
 
                     try:
                         choice = int(choice_input)
                     except ValueError:
-                        print("✗ 请输入有效的数字")
+                        error("请输入有效的数字")
                         return
 
                     if choice < 1 or choice > len(child_markets):
-                        print("✗ 无效的选择")
+                        error("无效的选择")
                         return
 
                     selected_child = child_markets[choice - 1]
                     selected_child_market = selected_child  # 保存到外层变量
                     market_id = selected_child.market_id
 
-                    print(f"\n✓ 已选择子市场: {selected_child.market_title}")
+                    success(f"已选择子市场: {selected_child.market_title}")
                     print(f"  子市场ID: {market_id}")
 
                     # 现在获取子市场的详细信息
@@ -10098,21 +10044,21 @@ class OpinionSDKTrader:
                 market_response = client.get_market(market_id=market_id)
 
                 if market_response.errno != 0:
-                    print(f"✗ 获取市场失败: {market_response.errmsg}")
+                    error(f"获取市场失败: {market_response.errmsg}")
                     print(f"  错误代码: {market_response.errno}")
                     return
 
                 if not market_response.result or not market_response.result.data:
-                    print(f"✗ 市场 {market_id} 不存在或数据为空")
+                    error(f"市场 {market_id} 不存在或数据为空")
                     return
 
                 market_data = market_response.result.data
 
                 if not hasattr(market_data, 'market_title') or not market_data.market_title:
-                    print(f"✗ 市场 {market_id} 数据不完整")
+                    error(f"市场 {market_id} 数据不完整")
                     return
 
-                print(f"\n✓ 找到二元市场: {market_data.market_title}")
+                success(f"找到二元市场: {market_data.market_title}")
                 print(f"  市场ID: {market_data.market_id}")
 
             # 显示市场详情
@@ -10121,7 +10067,7 @@ class OpinionSDKTrader:
             print(f"  NO Token ID: {market_data.no_token_id}")
 
         except Exception as e:
-            print(f"✗ 获取市场信息失败: {e}")
+            error(f"获取市场信息失败: {e}")
             import traceback
             traceback.print_exc()
             return
@@ -10144,7 +10090,7 @@ class OpinionSDKTrader:
         print(f"  1. {yes_token_name}")
         print(f"  2. {no_token_name}")
         print(f"  0. 返回")
-        side_choice = input("请输入选项 (0-2): ").strip()
+        side_choice = ask("请选择 (0-2)")
 
         if side_choice == '0' or not side_choice:
             return
@@ -10157,7 +10103,7 @@ class OpinionSDKTrader:
             token_id = market_data.no_token_id
             selected_token_name = no_token_name
         else:
-            print("✗ 无效的选择")
+            error("无效的选择")
             return
 
         # 第一次确认
@@ -10185,15 +10131,15 @@ class OpinionSDKTrader:
             print(f"  交易模式: 低损耗模式（先买后挂单）")
 
         print(f"  交易方向: {selected_token_name}")
-        print("="*60)
+        divider("═")
 
-        confirm = input("\n确认无误请输入 'done': ").strip().lower()
+        confirm = ask("确认无误请输入 'done': ").lower()
 
         if confirm != 'done':
-            print("✗ 已取消交易")
+            error("已取消交易")
             return
 
-        print(f"\n✓ 第一次确认通过")
+        success(f"第一次确认通过")
 
         # 4. 快速模式和低损耗模式的独立处理
         if trade_mode in ['quick_mode', 'low_loss_mode']:
@@ -10202,42 +10148,42 @@ class OpinionSDKTrader:
                 print(f"\n[*] 提示: 输入交易轮数，每轮包含买入1次+卖出1次=2笔交易")
                 print(f"   例如: 输入1 → 买1次+卖1次=2笔")
                 print(f"   例如: 输入2 → 买2次+卖2次=4笔")
-                num_input = input(f"请输入交易轮数: ").strip()
+                num_input = ask(f"请输入交易轮数: ")
                 try:
                     total_trades = int(num_input)
                     if total_trades < 1:
-                        print("✗ 次数必须大于0")
+                        error("次数必须大于0")
                         continue
 
                     print(
                         f"✓ 将执行: 买{total_trades}次 + 卖{total_trades}次 = {total_trades*2}笔交易")
                     break
                 except Exception:
-                    print("✗ 请输入有效数字")
+                    error("请输入有效数字")
 
             # 询问金额范围
             print(f"\n请设置单笔买入金额范围:")
             while True:
-                min_input = input(f"单笔最低金额 ($): ").strip()
+                min_input = ask(f"单笔最低金额 ($): ")
                 try:
                     min_amount = float(min_input)
                     if min_amount < 1:
-                        print("✗ 金额必须大于1")
+                        error("金额必须大于1")
                         continue
                     break
                 except Exception:
-                    print("✗ 请输入有效数字")
+                    error("请输入有效数字")
 
             while True:
-                max_input = input(f"单笔最高金额 ($): ").strip()
+                max_input = ask(f"单笔最高金额 ($): ")
                 try:
                     max_amount = float(max_input)
                     if max_amount < min_amount:
-                        print(f"✗ 最高金额必须 >= 最低金额({min_amount})")
+                        error(f"最高金额必须 >= 最低金额({min_amount})")
                         continue
                     break
                 except Exception:
-                    print("✗ 请输入有效数字")
+                    error("请输入有效数字")
 
             # 确认信息
             # 计算预估总金额 - total_trades是交易轮数（每轮=1买+1卖）
@@ -10262,7 +10208,7 @@ class OpinionSDKTrader:
                 action, skip_remarks = handle_insufficient_balance(
                     insufficient_accounts)
                 if action == 'cancel':
-                    print("✗ 已取消")
+                    error("已取消")
                     return
                 elif action == 'skip':
                     # 过滤掉余额不足的账户
@@ -10274,11 +10220,11 @@ class OpinionSDKTrader:
                     print(
                         f"\n✓ 已跳过 {original_count - len(selected_account_indices)} 个余额不足账户，剩余 {len(selected_account_indices)} 个账户")
                     if not selected_account_indices:
-                        print("✗ 没有剩余账户可执行交易")
+                        error("没有剩余账户可执行交易")
                         return
 
-            print(f"\n{'='*60}")
-            print(f"{'【快速模式/低损耗模式确认】':^60}")
+            console.print()
+            console.print(f"[bold]【快速模式/低损耗模式确认】[/bold]", justify="center")
             print(
                 f"  交易轮数: {total_trades}轮 (买{total_trades}次+卖{total_trades}次={total_trades*2}笔)")
             print(f"  单笔买入: ${min_amount:.2f} - ${max_amount:.2f}")
@@ -10291,11 +10237,11 @@ class OpinionSDKTrader:
                 print(f"  模式说明: 先买后挂卖")
                 print(f"  买入价格: 卖1（立即成交）")
                 print(f"  卖出价格: 用户选择挂单价格")
-            print(f"{'='*60}")
+            divider("═")
 
-            confirm2 = input("\n确认无误请输入 'done': ").strip().lower()
+            confirm2 = ask("确认无误请输入 'done': ").lower()
             if confirm2 != 'done':
-                print("✗ 已取消交易")
+                error("已取消交易")
                 return
 
             # 执行快速模式或低损耗模式
@@ -10442,10 +10388,10 @@ class OpinionSDKTrader:
                     token_balances[idx] = 0
 
             total_tokens = sum(token_balances.values())
-            print(f"\n✓ 总可用: {total_tokens} {selected_token_name} tokens")
+            success(f"总可用: {total_tokens} {selected_token_name} tokens")
 
             if total_tokens == 0:
-                print("✗ 选中账户持仓均为0，无法卖出")
+                error("选中账户持仓均为0，无法卖出")
                 return
 
         # 先卖后买模式：需要同时检查持仓和余额
@@ -10490,10 +10436,10 @@ class OpinionSDKTrader:
                     print(f"{idx:0{account_num_width}d}. {config.remark} 异常: {e}")
 
             total_tokens = sum(token_balances.values())
-            print(f"\n✓ 总持仓: {total_tokens} {selected_token_name} tokens")
+            success(f"总持仓: {total_tokens} {selected_token_name} tokens")
 
             if total_tokens == 0:
-                print("✗ 选中账户持仓均为0，无法进行先卖后买操作")
+                error("选中账户持仓均为0，无法进行先卖后买操作")
                 return
 
             # 使用之前查询的余额
@@ -10508,7 +10454,7 @@ class OpinionSDKTrader:
         # 5. 串行执行模式（已移除并发设置）
         selected_count = len(selected_account_indices)
         actual_concurrent = 1  # 固定为串行执行
-        print(f"\n✓ 执行模式: 串行（每个账户使用独立代理）")
+        success(f"执行模式: 串行（每个账户使用独立代理）")
 
         # 6. 创建账户列表（串行执行）
         # 创建账户列表：[(账户索引, client, config), ...] - 只包含选中的账户
@@ -10532,28 +10478,28 @@ class OpinionSDKTrader:
 
             while True:
                 try:
-                    min_amt = float(input("请输入单笔最低金额 ($): ").strip())
+                    min_amt = ask_float("请输入单笔最低金额 ($): ")
                     if min_amt <= 0:
-                        print("✗ 金额必须大于0")
+                        error("金额必须大于0")
                         continue
                     break
                 except ValueError:
-                    print("✗ 请输入有效的数字")
+                    error("请输入有效的数字")
 
             while True:
                 try:
-                    max_amt = float(input("请输入单笔最高金额 ($): ").strip())
+                    max_amt = ask_float("请输入单笔最高金额 ($): ")
                     if max_amt <= 0:
-                        print("✗ 金额必须大于0")
+                        error("金额必须大于0")
                         continue
                     if max_amt < min_amt:
-                        print(f"✗ 最高金额不能小于最低金额(${min_amt:.2f})")
+                        error(f"最高金额不能小于最低金额(${min_amt:.2f})")
                         continue
                     break
                 except ValueError:
-                    print("✗ 请输入有效的数字")
+                    error("请输入有效的数字")
 
-            print(f"\n✓ 单笔金额范围: ${min_amt:.2f} - ${max_amt:.2f}")
+            success(f"单笔金额范围: ${min_amt:.2f} - ${max_amt:.2f}")
 
         # 检查余额并自动调整
         if trade_mode != 'sell_only':
@@ -10571,19 +10517,19 @@ class OpinionSDKTrader:
                         zero_balance_accounts.append((idx, config.remark))
 
             if adjusted_accounts:
-                print(f"\n[!]  以下账户余额低于最低金额，将自动调整:")
+                warning(f" 以下账户余额低于最低金额，将自动调整:")
                 for idx, remark, balance, min_amt_needed in adjusted_accounts:
                     print(
                         f"  {remark}: ${balance:.2f} (原需最低 ${min_amt_needed:.2f}) → 调整为 ${balance:.2f}")
-                print(f"\n✓ 这些账户将使用实际余额进行交易")
+                success(f"这些账户将使用实际余额进行交易")
 
             if zero_balance_accounts:
-                print(f"\n[!]  以下账户余额为0，将跳过:")
+                warning(f" 以下账户余额为0，将跳过:")
                 for idx, remark in zero_balance_accounts:
                     print(f"  {remark}")
 
                 if len(zero_balance_accounts) == len(selected_account_indices):
-                    print(f"\n✗ 所有选中账户余额为0，无法交易")
+                    error(f"所有选中账户余额为0，无法交易")
                     return
 
         # 8. 输入交易次数（根据模式显示不同提示）
@@ -10601,20 +10547,20 @@ class OpinionSDKTrader:
 
         while True:
             try:
-                num_trades_input = input(f"{trades_prompt}").strip()
+                num_trades_input = ask(f"{trades_prompt}")
                 num_trades = int(num_trades_input)
                 if num_trades <= 0:
-                    print("✗ 交易次数必须大于0")
+                    error("交易次数必须大于0")
                     continue
                 break
             except ValueError:
-                print("✗ 请输入有效的整数")
+                error("请输入有效的整数")
 
         if trade_mode in ['buy_then_sell', 'sell_then_buy']:
             print(
                 f"✓ 将执行: 买{num_trades}次 + 卖{num_trades}次 = {num_trades*2}笔交易")
         else:
-            print(f"✓ 交易次数: {num_trades}笔")
+            success(f"交易次数: {num_trades}笔")
 
         # 显示预估总金额（非卖出模式）
         if trade_mode != 'sell_only':
@@ -10645,7 +10591,7 @@ class OpinionSDKTrader:
                 action, skip_remarks = handle_insufficient_balance(
                     insufficient_accounts)
                 if action == 'cancel':
-                    print("✗ 已取消")
+                    error("已取消")
                     return
                 elif action == 'skip':
                     # 过滤掉余额不足的账户
@@ -10657,7 +10603,7 @@ class OpinionSDKTrader:
                     print(
                         f"\n✓ 已跳过 {original_count - len(selected_account_indices)} 个余额不足账户，剩余 {len(selected_account_indices)} 个账户")
                     if not selected_account_indices:
-                        print("✗ 没有剩余账户可执行交易")
+                        error("没有剩余账户可执行交易")
                         return
 
         # 10. 大额交易额外确认（仅非"仅卖出"模式）
@@ -10668,7 +10614,7 @@ class OpinionSDKTrader:
 
             if total_max_amount > 5000:
                 print(f"\n" + "!"*60)
-                print("[!]  【大额交易警告】")
+                warning(" 【大额交易警告】")
                 print(f"  单笔金额范围: ${min_amt:.2f} - ${max_amt:.2f}")
                 print(f"  选中账户数: {len(selected_account_indices)}")
                 print(f"  交易次数: {num_trades}")
@@ -10677,13 +10623,13 @@ class OpinionSDKTrader:
 
                 # 第二次确认
                 print(f"\n【第二次确认】")
-                confirm2 = input("大额交易,请再次输入 'done' 确认: ").strip().lower()
+                confirm2 = ask("大额交易,请再次输入 'done' 确认").lower()
 
                 if confirm2 != 'done':
-                    print("✗ 已取消交易")
+                    error("已取消交易")
                     return
 
-                print(f"✓ 第二次确认通过")
+                success(f"第二次确认通过")
 
                 # 第三次确认 - 最后确认
                 print(f"\n" + "="*60)
@@ -10696,19 +10642,19 @@ class OpinionSDKTrader:
                 print(f"  方向: {selected_token_name}")
                 print(f"  单笔金额范围: ${min_amt:.2f} - ${max_amt:.2f}")
                 print(f"  最大可能总金额: ${total_max_amount:.2f}")
-                print("="*60)
-                print("\n[!]  请仔细检查:")
+                divider("═")
+                warning(" 请仔细检查:")
                 print("  - 市场选择是否正确?")
                 print("  - 交易方向是否正确?")
                 print("  - 交易金额是否正确?")
 
-                confirm3 = input("\n✓ 确定选择无误? (yes/no): ").strip().lower()
+                confirm3 = ask("✓ 确定选择无误? (yes/no): ").lower()
 
                 if confirm3 != 'yes':
-                    print("✗ 已取消交易")
+                    error("已取消交易")
                     return
 
-                print(f"\n✓✓✓ 三次确认完成,准备开始交易...")
+                success(f"✓✓✓ 三次确认完成,准备开始交易...")
 
         # 10. 检查盘口深度
         print(f"\n正在检查盘口深度...")
@@ -10731,11 +10677,11 @@ class OpinionSDKTrader:
         # 根据交易方向确定token_id
         if side_input == 'YES':
             token_id = market_data.yes_token_id
-            print(f"\n✓ 交易方向: YES")
+            success(f"交易方向: YES")
             print(f"  Token ID: {token_id}")
         else:
             token_id = market_data.no_token_id
-            print(f"\n✓ 交易方向: NO")
+            success(f"交易方向: NO")
             print(f"  Token ID: {token_id}")
 
         # 格式化价格显示函数（*100并去掉小数点后多余的0），提前定义防止后续调用时未定义
@@ -10797,34 +10743,32 @@ class OpinionSDKTrader:
 
                     if required_depth < max_total_amount:
                         shortage = max_total_amount - required_depth
-                        print(f"\n[!]  警告: 盘口深度可能不足!")
+                        warning(f" 警告: 盘口深度可能不足!")
                         print(f"  {depth_label}盘口: ${required_depth:.2f}")
                         print(
                             f"  最大可能{'买入' if side_input == 'YES' else '卖出'}: ${max_total_amount:.2f}")
                         print(f"  缺口: ${shortage:.2f}")
                         print(f"\n  注意: 由于每个账户独立随机金额，实际总金额会小于最大值")
 
-                        continue_choice = input(
-                            "\n是否继续? (y/n): ").strip().lower()
+                        continue_choice = ask("\n是否继续? (y/n): ").lower()
                         if continue_choice != 'y':
-                            print("✗ 已取消交易")
+                            error("已取消交易")
                             return
                     else:
-                        print(f"✓ 盘口深度充足")
+                        success(f"盘口深度充足")
             else:
                 error_msg = ob.get('error', '盘口数据为空')
-                print(f"[!]  警告: {error_msg}")
-                continue_choice = input(
-                    "\n无法获取盘口信息,是否继续? (y/n): ").strip().lower()
+                warning(f" 警告: {error_msg}")
+                continue_choice = ask("\n无法获取盘口信息,是否继续? (y/n): ").lower()
                 if continue_choice != 'y':
-                    print("✗ 已取消交易")
+                    error("已取消交易")
                     return
 
         except Exception as e:
-            print(f"[!]  盘口检查失败: {e}")
-            continue_choice = input("\n无法获取盘口信息,是否继续? (y/n): ").strip().lower()
+            warning(f" 盘口检查失败: {e}")
+            continue_choice = ask("无法获取盘口信息,是否继续? (y/n): ").lower()
             if continue_choice != 'y':
-                print("✗ 已取消交易")
+                error("已取消交易")
                 return
 
         # 10. 选择交易策略（根据模式调整询问顺序）
@@ -10842,12 +10786,12 @@ class OpinionSDKTrader:
             print("\n【第一步：卖出策略】")
             print("1. 限价单 (指定价格)")
             print("2. 市价单 (立即成交)")
-            sell_strategy = input("请选择 (1/2): ").strip()
+            sell_strategy = ask("请选择 (1/2)")
             sell_order_type = LIMIT_ORDER if sell_strategy == '1' else MARKET_ORDER
 
             if sell_order_type == LIMIT_ORDER:
                 if not bid_details and not ask_details:
-                    print("[!] 无盘口数据，自动切换为市价单")
+                    warning("无盘口数据，自动切换为市价单")
                     sell_order_type = MARKET_ORDER
                 else:
                     print("\n卖出限价单价格选择:")
@@ -10864,7 +10808,7 @@ class OpinionSDKTrader:
                         print(f"    {i}. 买{num} {format_price(price)}¢")
                     for i in range(len(bid_details) + 1, 6):
                         print(f"    {i}. 买{i} (无)")
-                    sell_price_choice = input("请选择 (1-10): ").strip()
+                    sell_price_choice = ask("请选择 (1-10)")
                     try:
                         sell_price_level = int(sell_price_choice)
                         if sell_price_level < 1 or sell_price_level > 10:
@@ -10878,12 +10822,12 @@ class OpinionSDKTrader:
             print("\n【第二步：买入策略】")
             print("1. 限价单 (指定价格)")
             print("2. 市价单 (立即成交)")
-            buy_strategy = input("请选择 (1/2): ").strip()
+            buy_strategy = ask("请选择 (1/2)")
             buy_order_type = LIMIT_ORDER if buy_strategy == '1' else MARKET_ORDER
 
             if buy_order_type == LIMIT_ORDER:
                 if not bid_details and not ask_details:
-                    print("[!] 无盘口数据，自动切换为市价单")
+                    warning("无盘口数据，自动切换为市价单")
                     buy_order_type = MARKET_ORDER
                 else:
                     print("\n买入限价单价格选择:")
@@ -10900,7 +10844,7 @@ class OpinionSDKTrader:
                         print(f"    {i}. 买{num} {format_price(price)}¢")
                     for i in range(len(bid_details) + 1, 6):
                         print(f"    {i}. 买{i} (无)")
-                    buy_price_choice = input("请选择 (1-10): ").strip()
+                    buy_price_choice = ask("请选择 (1-10)")
                     try:
                         buy_price_level = int(buy_price_choice)
                         if buy_price_level < 1 or buy_price_level > 10:
@@ -10917,7 +10861,7 @@ class OpinionSDKTrader:
             print("1. 限价单 (单档价格)")
             print("2. 市价单 (立即成交)")
             print("3. 分层挂单 (多档价格分散)")
-            sell_strategy = input("请选择 (1/2/3): ").strip()
+            sell_strategy = ask("请选择 (1/2/3)")
 
             # 分层挂单配置
             layered_sell_config = None
@@ -10926,20 +10870,20 @@ class OpinionSDKTrader:
                 # 分层挂单模式
                 sell_order_type = LIMIT_ORDER
                 if not bid_details and not ask_details:
-                    print("[!] 无盘口数据，无法使用分层挂单，自动切换为市价单")
+                    warning("无盘口数据，无法使用分层挂单，自动切换为市价单")
                     sell_order_type = MARKET_ORDER
                 else:
                     layered_sell_config = self._configure_layered_order(
                         'sell', bid_details, ask_details, format_price)
                     if not layered_sell_config:
-                        print("[!] 分层配置取消，自动切换为市价单")
+                        warning("分层配置取消，自动切换为市价单")
                         sell_order_type = MARKET_ORDER
             else:
                 sell_order_type = LIMIT_ORDER if sell_strategy == '1' else MARKET_ORDER
 
                 if sell_order_type == LIMIT_ORDER:
                     if not bid_details and not ask_details:
-                        print("[!] 无盘口数据，自动切换为市价单")
+                        warning("无盘口数据，自动切换为市价单")
                         sell_order_type = MARKET_ORDER
                     else:
                         print("\n限价单价格选择:")
@@ -10957,7 +10901,7 @@ class OpinionSDKTrader:
                             print(f"    {i}. 买{num} {format_price(price)}¢")
                         for i in range(len(bid_details) + 1, 6):
                             print(f"    {i}. 买{i} (无)")
-                        sell_price_choice = input("请选择 (1-10): ").strip()
+                        sell_price_choice = ask("请选择 (1-10)")
                         try:
                             sell_price_level = int(sell_price_choice)
                             if sell_price_level < 1 or sell_price_level > 10:
@@ -10975,7 +10919,7 @@ class OpinionSDKTrader:
             print("1. 限价单 (单档价格)")
             print("2. 市价单 (立即成交)")
             print("3. 分层挂单 (多档价格分散)")
-            buy_strategy = input("请选择 (1/2/3): ").strip()
+            buy_strategy = ask("请选择 (1/2/3)")
 
             # 分层挂单配置
             layered_buy_config = None
@@ -10984,20 +10928,20 @@ class OpinionSDKTrader:
                 # 分层挂单模式
                 buy_order_type = LIMIT_ORDER
                 if not bid_details and not ask_details:
-                    print("[!] 无盘口数据，无法使用分层挂单，自动切换为市价单")
+                    warning("无盘口数据，无法使用分层挂单，自动切换为市价单")
                     buy_order_type = MARKET_ORDER
                 else:
                     layered_buy_config = self._configure_layered_order(
                         'buy', bid_details, ask_details, format_price)
                     if not layered_buy_config:
-                        print("[!] 分层配置取消，自动切换为市价单")
+                        warning("分层配置取消，自动切换为市价单")
                         buy_order_type = MARKET_ORDER
             else:
                 buy_order_type = LIMIT_ORDER if buy_strategy == '1' else MARKET_ORDER
 
                 if buy_order_type == LIMIT_ORDER:
                     if not bid_details and not ask_details:
-                        print("[!] 无盘口数据，自动切换为市价单")
+                        warning("无盘口数据，自动切换为市价单")
                         buy_order_type = MARKET_ORDER
                     else:
                         print("\n限价单价格选择:")
@@ -11015,7 +10959,7 @@ class OpinionSDKTrader:
                             print(f"    {i}. 买{num} {format_price(price)}¢")
                         for i in range(len(bid_details) + 1, 6):
                             print(f"    {i}. 买{i} (无)")
-                        buy_price_choice = input("请选择 (1-10): ").strip()
+                        buy_price_choice = ask("请选择 (1-10)")
                         try:
                             buy_price_level = int(buy_price_choice)
                             if buy_price_level < 1 or buy_price_level > 10:
@@ -11032,12 +10976,12 @@ class OpinionSDKTrader:
             print("\n【第一步：买入策略】")
             print("1. 限价单 (指定价格)")
             print("2. 市价单 (立即成交)")
-            buy_strategy = input("请选择 (1/2): ").strip()
+            buy_strategy = ask("请选择 (1/2)")
             buy_order_type = LIMIT_ORDER if buy_strategy == '1' else MARKET_ORDER
 
             if buy_order_type == LIMIT_ORDER:
                 if not bid_details and not ask_details:
-                    print("[!] 无盘口数据，自动切换为市价单")
+                    warning("无盘口数据，自动切换为市价单")
                     buy_order_type = MARKET_ORDER
                 else:
                     print("\n买入限价单价格选择:")
@@ -11054,7 +10998,7 @@ class OpinionSDKTrader:
                         print(f"    {i}. 买{num} {format_price(price)}¢")
                     for i in range(len(bid_details) + 1, 6):
                         print(f"    {i}. 买{i} (无)")
-                    buy_price_choice = input("请选择 (1-10): ").strip()
+                    buy_price_choice = ask("请选择 (1-10)")
                     try:
                         buy_price_level = int(buy_price_choice)
                         if buy_price_level < 1 or buy_price_level > 10:
@@ -11068,12 +11012,12 @@ class OpinionSDKTrader:
             print("\n【第二步：卖出策略】")
             print("1. 限价单 (指定价格)")
             print("2. 市价单 (立即成交)")
-            sell_strategy = input("请选择 (1/2): ").strip()
+            sell_strategy = ask("请选择 (1/2)")
             sell_order_type = LIMIT_ORDER if sell_strategy == '1' else MARKET_ORDER
 
             if sell_order_type == LIMIT_ORDER:
                 if not bid_details and not ask_details:
-                    print("[!] 无盘口数据，自动切换为市价单")
+                    warning("无盘口数据，自动切换为市价单")
                     sell_order_type = MARKET_ORDER
                 else:
                     print("\n卖出限价单价格选择:")
@@ -11090,7 +11034,7 @@ class OpinionSDKTrader:
                         print(f"    {i}. 买{num} {format_price(price)}¢")
                     for i in range(len(bid_details) + 1, 6):
                         print(f"    {i}. 买{i} (无)")
-                    sell_price_choice = input("请选择 (1-10): ").strip()
+                    sell_price_choice = ask("请选择 (1-10)")
                     try:
                         sell_price_level = int(sell_price_choice)
                         if sell_price_level < 1 or sell_price_level > 10:
@@ -11104,14 +11048,14 @@ class OpinionSDKTrader:
         # 12. 开始交易
         print("\n" + "="*60)
         print("开始执行交易")
-        print("="*60)
+        divider("═")
 
         # 定义单账户交易执行函数
         def execute_account_trading(account_idx, client, config, account_balance):
             """单个账户的交易执行函数"""
-            print(f"\n{'='*60}")
+            console.print()
             print(f"{config.remark} [{config.eoa_address[:10]}...]")
-            print(f"{'='*60}")
+            divider("═")
 
             actual_num_trades = num_trades
 
@@ -11189,7 +11133,7 @@ class OpinionSDKTrader:
                             print(f"  初始token余额: {initial_token_balance}")
                             break
             except Exception as e:
-                print(f"  [!]  无法查询初始余额: {e}")
+                warning(f"无法查询初始余额: {e}")
 
             # 根据交易模式决定执行顺序
             # sell_then_buy模式：先卖后买
@@ -11250,7 +11194,7 @@ class OpinionSDKTrader:
                                     print(
                                         f"  ✗ 买入#{i}失败: {self.translate_error(result.errmsg)}")
                             else:
-                                print(f"  ✗ 获取盘口失败: {ob.get('error', '未知错误')}")
+                                error(f"获取盘口失败: {ob.get('error', '未知错误')}")
 
                             # 随机延迟
                             delay = random.uniform(3, 10)
@@ -11262,19 +11206,19 @@ class OpinionSDKTrader:
                                 print(
                                     f"  [!] 买入#{i}: 网关超时(504)，订单可能已提交，请稍后检查持仓")
                             elif "502" in error_str or "Bad Gateway" in error_str:
-                                print(f"  [!] 买入#{i}: 网关错误(502)，请稍后重试")
+                                warning(f"买入#{i}: 网关错误(502)，请稍后重试")
                             elif "503" in error_str or "Service Unavailable" in error_str:
-                                print(f"  [!] 买入#{i}: 服务暂时不可用(503)，请稍后重试")
+                                warning(f"买入#{i}: 服务暂时不可用(503)，请稍后重试")
                             elif "timeout" in error_str.lower() or "timed out" in error_str.lower():
-                                print(f"  [!] 买入#{i}: 请求超时，请检查网络连接")
+                                warning(f"买入#{i}: 请求超时，请检查网络连接")
                             elif "Connection" in error_str:
-                                print(f"  [!] 买入#{i}: 连接失败，请检查网络或代理")
+                                warning(f"买入#{i}: 连接失败，请检查网络或代理")
                             else:
-                                print(f"  ✗ 买入#{i}异常: {e}")
+                                error(f"买入#{i}异常: {e}")
 
             # 如果是仅买入模式，买入完成后直接结束
             if trade_mode == 'buy_only':
-                print(f"\n✓ 仅买入模式，交易完成")
+                success(f"仅买入模式，交易完成")
                 return
 
             # 如果是买入+卖出模式，直接进入卖出（不等待，由外层统一等待）
@@ -11342,18 +11286,18 @@ class OpinionSDKTrader:
                                 print(f"\n  当前可用余额: {total_bought} tokens")
 
                             if total_bought <= 0:
-                                print(f"  [!]  当前无可卖token，跳过卖出")
+                                warning(f"当前无可卖token，跳过卖出")
                                 return
 
                             if total_bought < 5:
-                                print(f"  [!]  可用余额太少(<5)，不值得卖出，跳过")
+                                warning(f"可用余额太少(<5)，不值得卖出，跳过")
                                 return
                         else:
                             print(
                                 f"  [!]  无法查询余额: errno={positions_response.errno}")
                             return
                     except Exception as e:
-                        print(f"  ✗ 查询余额异常: {e}")
+                        error(f"查询余额异常: {e}")
                         return
 
                 # 检查是否使用分层挂单（仅卖出模式）
@@ -11486,7 +11430,7 @@ class OpinionSDKTrader:
                                         break
 
                             if not retry_success:
-                                print(f"  ✗ 卖出#{i}: 等待3次后仍无可用余额，跳过")
+                                error(f"卖出#{i}: 等待3次后仍无可用余额，跳过")
                                 continue
 
                         # 计算本次卖出数量
@@ -11539,7 +11483,7 @@ class OpinionSDKTrader:
                             continue
 
                     except Exception as e:
-                        print(f"  ✗ 卖出#{i}: 查询余额异常: {e}")
+                        error(f"卖出#{i}: 查询余额异常: {e}")
                         continue
 
                     try:
@@ -11614,7 +11558,7 @@ class OpinionSDKTrader:
                                     print(
                                         f"  ✗ 卖出#{i}失败: {self.translate_error(result.errmsg)}")
                         else:
-                            print(f"  ✗ 获取盘口失败: {ob.get('error', '未知错误')}")
+                            error(f"获取盘口失败: {ob.get('error', '未知错误')}")
 
                         # 随机延迟
                         delay = random.uniform(3, 10)
@@ -11623,17 +11567,17 @@ class OpinionSDKTrader:
                     except Exception as e:
                         error_str = str(e)
                         if "504" in error_str or "Gateway Time-out" in error_str:
-                            print(f"  [!] 卖出#{i}: 网关超时(504)，订单可能已提交，请稍后检查持仓")
+                            warning(f"卖出#{i}: 网关超时(504)，订单可能已提交，请稍后检查持仓")
                         elif "502" in error_str or "Bad Gateway" in error_str:
-                            print(f"  [!] 卖出#{i}: 网关错误(502)，请稍后重试")
+                            warning(f"卖出#{i}: 网关错误(502)，请稍后重试")
                         elif "503" in error_str or "Service Unavailable" in error_str:
-                            print(f"  [!] 卖出#{i}: 服务暂时不可用(503)，请稍后重试")
+                            warning(f"卖出#{i}: 服务暂时不可用(503)，请稍后重试")
                         elif "timeout" in error_str.lower() or "timed out" in error_str.lower():
-                            print(f"  [!] 卖出#{i}: 请求超时，请检查网络连接")
+                            warning(f"卖出#{i}: 请求超时，请检查网络连接")
                         elif "Connection" in error_str:
-                            print(f"  [!] 卖出#{i}: 连接失败，请检查网络或代理")
+                            warning(f"卖出#{i}: 连接失败，请检查网络或代理")
                         else:
-                            print(f"  ✗ 卖出#{i}异常: {e}")
+                            error(f"卖出#{i}异常: {e}")
 
             # 如果是sell_then_buy模式，卖出完成后执行买入
             if trade_mode == 'sell_then_buy':
@@ -11672,7 +11616,7 @@ class OpinionSDKTrader:
                                 print(
                                     f"  ✗ 买入#{i}失败: {self.translate_error(result.errmsg)}")
                         else:
-                            print(f"  ✗ 获取盘口失败: {ob.get('error', '未知错误')}")
+                            error(f"获取盘口失败: {ob.get('error', '未知错误')}")
 
                         delay = random.uniform(3, 10)
                         time.sleep(delay)
@@ -11680,17 +11624,17 @@ class OpinionSDKTrader:
                     except Exception as e:
                         error_str = str(e)
                         if "504" in error_str or "Gateway Time-out" in error_str:
-                            print(f"  [!] 买入#{i}: 网关超时(504)，订单可能已提交，请稍后检查持仓")
+                            warning(f"买入#{i}: 网关超时(504)，订单可能已提交，请稍后检查持仓")
                         elif "502" in error_str or "Bad Gateway" in error_str:
-                            print(f"  [!] 买入#{i}: 网关错误(502)，请稍后重试")
+                            warning(f"买入#{i}: 网关错误(502)，请稍后重试")
                         elif "503" in error_str or "Service Unavailable" in error_str:
-                            print(f"  [!] 买入#{i}: 服务暂时不可用(503)，请稍后重试")
+                            warning(f"买入#{i}: 服务暂时不可用(503)，请稍后重试")
                         elif "timeout" in error_str.lower() or "timed out" in error_str.lower():
-                            print(f"  [!] 买入#{i}: 请求超时，请检查网络连接")
+                            warning(f"买入#{i}: 请求超时，请检查网络连接")
                         elif "Connection" in error_str:
-                            print(f"  [!] 买入#{i}: 连接失败，请检查网络或代理")
+                            warning(f"买入#{i}: 连接失败，请检查网络或代理")
                         else:
-                            print(f"  ✗ 买入#{i}异常: {e}")
+                            error(f"买入#{i}异常: {e}")
 
         # 多账户后台并发执行（每个账户独立线程，使用各自代理）
         import threading
@@ -11730,36 +11674,34 @@ class OpinionSDKTrader:
 
         print("\n" + "="*60)
         print("所有交易完成!")
-        print("="*60)
+        divider("═")
 
     def websocket_monitor_menu(self):
         """WebSocket 实时监控菜单"""
-        print(f"\n{'='*60}")
-        print(f"{'WebSocket 实时监控':^60}")
-        print(f"{'='*60}")
+        section("WebSocket 实时监控")
 
         # 使用第一个账户的 API Key
         if not self.configs:
-            print("✗ 没有可用的账户配置")
+            error("没有可用的账户配置")
             return
 
         api_key = self.configs[0].api_key
 
         # 输入市场ID
-        market_input = input("\n请输入要监控的市场ID (多个用逗号分隔): ").strip()
+        market_input = ask("请输入要监控的市场ID (多个用逗号分隔): ")
         if not market_input:
-            print("✗ 未输入市场ID")
+            error("未输入市场ID")
             return
 
         try:
             market_ids = [int(m.strip())
                           for m in market_input.split(',') if m.strip()]
         except ValueError:
-            print("✗ 市场ID格式错误，请输入数字")
+            error("市场ID格式错误，请输入数字")
             return
 
         if not market_ids:
-            print("✗ 未输入有效的市场ID")
+            error("未输入有效的市场ID")
             return
 
         # 获取市场标题
@@ -11776,21 +11718,19 @@ class OpinionSDKTrader:
                     data = resp.json()
                     market_titles[market_id] = data.get(
                         'title', f'Market#{market_id}')[:30]
-                    print(f"  ✓ {market_id}: {market_titles[market_id]}")
+                    success(f"{market_id}: {market_titles[market_id]}")
             except Exception:
                 market_titles[market_id] = f'Market#{market_id}'
 
         # 选择订阅类型
-        print(f"\n{'='*60}")
-        print(f"{'选择订阅类型':^60}")
-        print(f"{'='*60}")
+        section("选择订阅类型")
         print("  1. 全部 (订单簿+价格+成交)")
         print("  2. 仅订单簿变动")
         print("  3. 仅价格变动")
         print("  4. 仅成交信息")
         print("  5. 价格+成交 (推荐)")
 
-        sub_choice = input("\n请选择 (1-5, 默认5): ").strip() or "5"
+        sub_choice = ask("请选择 (1-5, 默认5): ") or "5"
 
         subscribe_orderbook = sub_choice in ['1', '2']
         subscribe_price = sub_choice in ['1', '3', '5']
@@ -11813,7 +11753,7 @@ class OpinionSDKTrader:
         try:
             asyncio.run(run_monitor())
         except KeyboardInterrupt:
-            print("\n✓ 监控已停止")
+            success("监控已停止")
 
 
 # 代理地址缓存文件路径
@@ -11973,7 +11913,7 @@ def load_configs(config_file: str) -> List[TraderConfig]:
                         need_fetch_proxy.append(len(configs))
                 configs.append(config)
             else:
-                print(f"[!]  警告: 第{line_num}行格式不正确，已跳过 (只有{len(parts)}个字段)")
+                warning(f" 警告: 第{line_num}行格式不正确，已跳过 (只有{len(parts)}个字段)")
                 print(f"   正确格式: 备注 api_key EOA地址 私钥 [代理地址]")
                 print(f"   分隔符支持: | 空格 Tab（可混合使用）")
 
@@ -11996,7 +11936,7 @@ def load_configs(config_file: str) -> List[TraderConfig]:
                 fetch_needed.append(idx)
 
         if cached_count > 0:
-            print(f"\n✓ 从缓存加载 {cached_count} 个代理地址")
+            success(f"从缓存加载 {cached_count} 个代理地址")
 
         if fetch_needed:
             print(f"正在获取 {len(fetch_needed)} 个新账户的代理地址...")
@@ -12011,7 +11951,7 @@ def load_configs(config_file: str) -> List[TraderConfig]:
                         f"  ✓ [{config.remark}] {proxy_addr[:10]}...{proxy_addr[-6:]}")
                 else:
                     failed.append(config.remark)
-                    print(f"  ✗ [{config.remark}] 获取失败")
+                    error(f"[{config.remark}] 获取失败")
 
             if failed:
                 print(
@@ -12031,7 +11971,7 @@ def load_configs_from_directory(config_dir: str) -> List[TraderConfig]:
     supported_extensions = ('.txt', '.conf', '.cfg')
 
     if not os.path.isdir(config_dir):
-        print(f"✗ 目录不存在: {config_dir}")
+        error(f"目录不存在: {config_dir}")
         return []
 
     # 获取目录下所有配置文件
@@ -12044,7 +11984,7 @@ def load_configs_from_directory(config_dir: str) -> List[TraderConfig]:
             config_files.append(os.path.join(config_dir, filename))
 
     if not config_files:
-        print(f"✗ 目录中没有找到配置文件: {config_dir}")
+        error(f"目录中没有找到配置文件: {config_dir}")
         print(f"  支持的格式: {', '.join(supported_extensions)}")
         return []
 
@@ -12061,7 +12001,7 @@ def load_configs_from_directory(config_dir: str) -> List[TraderConfig]:
                     f"  ✓ {os.path.basename(config_file)}: {len(configs)} 个账户")
                 all_configs.extend(configs)
         except Exception as e:
-            print(f"  ✗ {os.path.basename(config_file)}: 加载失败 - {e}")
+            error(f"{os.path.basename(config_file)}: 加载失败 - {e}")
 
     return all_configs
 
@@ -12087,19 +12027,19 @@ def main():
             return
         elif cmd in ['help', '-h', '--help']:
             print("用法: python trade.py [命令] [配置路径]")
-            print()
+            console.print()
             print("命令:")
             print("  (无)      交互式启动")
             print("  stop      停止后台守护进程")
             print("  status    查看守护进程状态")
             print("  log       实时查看日志")
             print("  help      显示帮助信息")
-            print()
+            console.print()
             print("配置路径:")
             print("  可以是文件路径或目录路径")
             print("  - 文件: 直接加载该配置文件")
             print("  - 目录: 加载目录下所有 .txt/.conf/.cfg 文件")
-            print()
+            console.print()
             print("示例:")
             print("  python trade.py                    # 交互式输入配置路径")
             print("  python trade.py ./configs          # 加载 configs 目录下所有配置")
@@ -12113,8 +12053,7 @@ def main():
             config_path = sys.argv[1]
 
         if not config_path:
-            config_path = input(
-                "请输入配置文件或目录路径 (默认: trader_configs.txt): ").strip()
+            config_path = ask("请输入配置文件或目录路径 (默认: trader_configs.txt): ")
         if not config_path:
             config_path = "trader_configs.txt"
 
@@ -12126,22 +12065,22 @@ def main():
             # 文件模式：加载单个配置文件
             configs = load_configs(config_path)
         else:
-            print(f"✗ 路径不存在: {config_path}")
+            error(f"路径不存在: {config_path}")
             return
 
         if not configs:
-            print(f"✗ 未加载到任何账户配置")
+            error(f"未加载到任何账户配置")
             return
 
-        print(f"\n✓ 总共加载了 {len(configs)} 个账户配置")
+        success(f"总共加载了 {len(configs)} 个账户配置")
 
         trader = OpinionSDKTrader(configs)
         trader.run_trading_session()
 
     except KeyboardInterrupt:
-        print(f"\n\n✓ 用户中断，程序退出")
+        success(f"用户中断，程序退出")
     except Exception as e:
-        print(f"✗ 错误: {e}")
+        error(f"错误: {e}")
         import traceback
         traceback.print_exc()
 

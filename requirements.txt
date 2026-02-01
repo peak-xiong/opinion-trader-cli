@@ -3,3 +3,7 @@ httpx[socks]
 pydantic
 python-dotenv
 websockets
+requests
+pysocks
+rich>=13.0
+questionary>=2.0

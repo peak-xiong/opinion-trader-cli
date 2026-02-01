@@ -1,23 +1,10 @@
 name: Build Executables
 
 on:
-  # 手动触发
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version tag (e.g., 3.0.0)"
-        required: false
-        default: "3.0.0"
-
-  # push 到 main 时自动触发
   push:
     branches:
       - main
-    paths:
-      - "src/**"
-      - "build.py"
-      - "pyproject.toml"
-      - ".github/workflows/build.yml"
 
 jobs:
   build:
@@ -28,14 +15,8 @@ jobs:
           - os: macos-latest
             platform: macos
             arch: arm64
-          - os: macos-13
-            platform: macos
-            arch: x64
           - os: windows-latest
             platform: windows
-            arch: x64
-          - os: ubuntu-latest
-            platform: linux
             arch: x64
 
     runs-on: ${{ matrix.os }}
@@ -58,10 +39,6 @@ jobs:
       - name: Build executable
         run: python build.py --clean
 
-      - name: List dist directory
-        run: ls -la dist/
-        shell: bash
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -69,7 +46,6 @@ jobs:
           path: dist/opinion-trader-*
           retention-days: 90
 
-  # 合并所有构建产物到一个下载包
   package:
     needs: build
     runs-on: ubuntu-latest

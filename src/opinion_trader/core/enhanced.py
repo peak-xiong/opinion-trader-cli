@@ -201,66 +201,160 @@ class MergeSplitService:
     """
 
     @staticmethod
-    def merge(client, market_id: int, shares: int) -> dict:
+    def merge(client, market_id: int, shares: int, max_retries: int = 3) -> dict:
         """合并操作（YES + NO → USDT）
 
         Args:
             client: SDK 客户端
             market_id: 市场ID
             shares: 合并数量
+            max_retries: 最大重试次数（网络错误时）
 
         Returns:
             {
                 'success': bool,
                 'tx_hash': str,
-                'error': str
+                'error': str,
+                'warning': str
             }
         """
-        try:
-            # 调用 SDK 的 merge 接口
-            result = client.merge(market_id=market_id, shares=shares)
+        import time
+        
+        shares_int = int(shares)
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                # 调用 SDK 的 merge 接口
+                result = client.merge(market_id=market_id, shares=shares_int)
+                
+                # 处理 Tuple 返回值（新版 SDK）
+                if isinstance(result, tuple):
+                    if result and result[0]:
+                        return {'success': True, 'tx_hash': result[0]}
+                    else:
+                        return {'success': False, 'error': f'合并失败: {result}'}
 
-            if hasattr(result, 'errno') and result.errno == 0:
-                tx_hash = result.result.tx_hash if hasattr(result.result, 'tx_hash') else ''
-                return {'success': True, 'tx_hash': tx_hash}
-            else:
-                error_msg = result.errmsg if hasattr(result, 'errmsg') else '合并失败'
-                return {'success': False, 'error': error_msg}
+                # 处理带 errno 的结果（旧版 SDK）
+                if hasattr(result, 'errno') and result.errno == 0:
+                    tx_hash = ''
+                    if result.result:
+                        tx_hash = getattr(result.result, 'tx_hash', '') or ''
+                    return {'success': True, 'tx_hash': tx_hash}
+                else:
+                    error_msg = getattr(result, 'errmsg', '合并失败') or '合并失败'
+                    return {'success': False, 'error': error_msg}
 
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
+            except Exception as e:
+                error_str = str(e)
+                last_error = error_str
+                
+                # 检查是否包含交易哈希
+                if 'Transaction hash:' in error_str:
+                    tx_hash = error_str.split('Transaction hash:')[-1].strip().split()[0]
+                    return {'success': True, 'tx_hash': tx_hash, 'warning': error_str}
+                
+                # 网络错误时重试
+                is_network_error = any(x in error_str.lower() for x in [
+                    'ssl', 'connection', 'timeout', 'max retries', 'eof'
+                ])
+                
+                if is_network_error and attempt < max_retries - 1:
+                    time.sleep(2 * (attempt + 1))
+                    continue
+                
+                return {'success': False, 'error': error_str}
+        
+        return {'success': False, 'error': last_error or '合并失败'}
 
     @staticmethod
-    def split(client, market_id: int, amount: float) -> dict:
+    def split(client, market_id: int, amount: float, max_retries: int = 3) -> dict:
         """拆分操作（USDT → YES + NO）
 
         Args:
             client: SDK 客户端
             market_id: 市场ID
             amount: 拆分金额（USDT）
+            max_retries: 最大重试次数（网络错误时）
 
         Returns:
             {
                 'success': bool,
                 'tx_hash': str,
                 'shares': int,  # 拆分得到的份额
-                'error': str
+                'error': str,
+                'warning': str  # 可能的警告信息
             }
         """
-        try:
-            # 调用 SDK 的 split 接口
-            result = client.split(market_id=market_id, amount=amount)
+        import time
+        
+        # amount 必须是整数
+        amount_int = int(amount)
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                # 调用 SDK 的 split 接口
+                # SDK 可能返回 Tuple[tx_hash, safe_tx_hash, return_value] 或带 errno 的结果
+                result = client.split(market_id=market_id, amount=amount_int)
+                
+                # 调试日志
+                import logging
+                logging.info(f"Split result type: {type(result)}, value: {result}")
+                
+                # 处理 Tuple 返回值（新版 SDK）
+                if isinstance(result, tuple):
+                    tx_hash = result[0] if result else None
+                    # 检查 tx_hash 是否有效（非空字符串，且看起来像交易哈希）
+                    if tx_hash and isinstance(tx_hash, str) and len(tx_hash) > 10:
+                        return {
+                            'success': True, 
+                            'tx_hash': tx_hash, 
+                            'shares': amount_int
+                        }
+                    else:
+                        return {'success': False, 'error': f'拆分失败: SDK返回 {result}'}
+                
+                # 处理带 errno 的结果（旧版 SDK）
+                if hasattr(result, 'errno') and result.errno == 0:
+                    tx_hash = ''
+                    if result.result:
+                        tx_hash = getattr(result.result, 'tx_hash', '') or ''
+                    return {
+                        'success': True, 
+                        'tx_hash': tx_hash, 
+                        'shares': amount_int
+                    }
+                else:
+                    error_msg = getattr(result, 'errmsg', '拆分失败') or '拆分失败'
+                    return {'success': False, 'error': error_msg}
 
-            if hasattr(result, 'errno') and result.errno == 0:
-                tx_hash = result.result.tx_hash if hasattr(result.result, 'tx_hash') else ''
-                shares = int(amount)  # 拆分份额 = 金额（1 USDT = 1份 YES + 1份 NO）
-                return {'success': True, 'tx_hash': tx_hash, 'shares': shares}
-            else:
-                error_msg = result.errmsg if hasattr(result, 'errmsg') else '拆分失败'
-                return {'success': False, 'error': error_msg}
-
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
+            except Exception as e:
+                error_str = str(e)
+                last_error = error_str
+                
+                # 检查是否包含交易哈希（可能是成功但抛出异常的情况）
+                if 'Transaction hash:' in error_str:
+                    tx_hash = error_str.split('Transaction hash:')[-1].strip().split()[0]
+                    return {
+                        'success': True, 
+                        'tx_hash': tx_hash, 
+                        'shares': amount_int,
+                        'warning': error_str
+                    }
+                
+                # 网络错误时重试
+                is_network_error = any(x in error_str.lower() for x in [
+                    'ssl', 'connection', 'timeout', 'max retries', 'eof'
+                ])
+                
+                if is_network_error and attempt < max_retries - 1:
+                    time.sleep(2 * (attempt + 1))  # 递增等待时间
+                    continue
+                
+                return {'success': False, 'error': error_str}
+        
+        return {'success': False, 'error': last_error or '拆分失败'}
 
 
 # ============ 增强版下单服务 ============
