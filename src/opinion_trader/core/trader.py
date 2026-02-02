@@ -1,44 +1,81 @@
-from opinion_clob_sdk.chain.py_order_utils.model.order_type import LIMIT_ORDER, MARKET_ORDER
-from opinion_clob_sdk.chain.py_order_utils.model.sides import OrderSide
-from opinion_clob_sdk.chain.py_order_utils.model.order import PlaceOrderDataInput
-from opinion_clob_sdk import Client
-from opinion_trader.core.enhanced import (
-    TradeSummary, TradeRecord, OrderCalculator,
-    MergeSplitService, EnhancedOrderService, OrderInputHelper
-)
-from opinion_trader.services.orderbook_manager import OrderbookManager, OrderbookState, MultiTokenOrderbookManager
-from opinion_trader.websocket.client import OpinionWebSocket, WebSocketMonitor
-from opinion_trader.services.services import (
-    OrderbookService, OrderBuilder, UserConfirmation,
-    MarketInfoService, AccountIterator, PositionService,
-    handle_insufficient_balance, MarketListService
-)
-from opinion_trader.display.display import (
-    ProgressBar, TableDisplay, PositionDisplay,
-    BalanceDisplay, OrderDisplay, OrderbookDisplay
-)
-from opinion_trader.config.models import TraderConfig, MarketMakerConfig, MarketMakerState
-from opinion_trader.utils.console import (
-    console, header, section, divider, rule, banner, clear,
-    success, error, warning, info, dim,
-    kv, bullet, pause,
-    select, select_multiple, confirm,
-    ask, ask_int, ask_float,
-    table, create_table, print_table,
-)
 import asyncio
-import random
-import time
+import atexit
+import json
 import os
+import random
+import signal
 import sys
 import threading
-import requests
-import json
-import signal
-import atexit
-from typing import List, Dict, Callable, Optional
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Callable, Dict, List, Optional
+
+import requests
+from opinion_clob_sdk import Client
+from opinion_clob_sdk.chain.py_order_utils.model.order import PlaceOrderDataInput
+from opinion_clob_sdk.chain.py_order_utils.model.order_type import LIMIT_ORDER, MARKET_ORDER
+from opinion_clob_sdk.chain.py_order_utils.model.sides import OrderSide
+
+from opinion_trader.config.models import MarketMakerConfig, MarketMakerState, TraderConfig
+from opinion_trader.core.enhanced import (
+    EnhancedOrderService,
+    MergeSplitService,
+    OrderCalculator,
+    OrderInputHelper,
+    TradeRecord,
+    TradeSummary,
+)
+from opinion_trader.display.display import (
+    BalanceDisplay,
+    OrderbookDisplay,
+    OrderDisplay,
+    PositionDisplay,
+    ProgressBar,
+    TableDisplay,
+)
+from opinion_trader.services.orderbook_manager import (
+    MultiTokenOrderbookManager,
+    OrderbookManager,
+    OrderbookState,
+)
+from opinion_trader.services.services import (
+    AccountIterator,
+    MarketInfoService,
+    MarketListService,
+    OrderbookService,
+    OrderBuilder,
+    PositionService,
+    UserConfirmation,
+    handle_insufficient_balance,
+)
+from opinion_trader.utils.console import (
+    ask,
+    ask_float,
+    ask_int,
+    banner,
+    bullet,
+    clear,
+    confirm,
+    console,
+    create_table,
+    dim,
+    divider,
+    error,
+    header,
+    info,
+    kv,
+    pause,
+    print_table,
+    rule,
+    section,
+    select,
+    select_multiple,
+    success,
+    table,
+    warning,
+)
+from opinion_trader.websocket.client import OpinionWebSocket, WebSocketMonitor
 
 
 class DaemonProcess:
@@ -5375,8 +5412,8 @@ class OpinionSDKTrader:
 
     def _run_batch_market_maker(self, market_configs: list, base_config: MarketMakerConfig):
         """运行批量多市场做市"""
-        import threading
         import copy
+        import threading
 
         console.print()
         print(f"批量做市商已启动 ({len(market_configs)}个市场)")
@@ -5536,8 +5573,8 @@ class OpinionSDKTrader:
 
     def _run_market_maker_polling(self, config: MarketMakerConfig, account_indices: list):
         """运行做市商 - 轮询模式（原有逻辑）"""
-        import threading
         import copy
+        import threading
 
         console.print()
         console.print(f"[bold]做市商已启动 [轮询模式][/bold]", justify="center")
@@ -6390,7 +6427,7 @@ class OpinionSDKTrader:
     def _mm_emergency_market_sell(self, client, cfg, config: MarketMakerConfig,
                                   state: MarketMakerState, shares: int):
         """紧急市价卖出"""
-        from opinion_sdk import PlaceOrderDataInput, OrderSide, MARKET_ORDER
+        from opinion_sdk import MARKET_ORDER, OrderSide, PlaceOrderDataInput
 
         try:
             order = PlaceOrderDataInput(
@@ -8666,8 +8703,8 @@ class OpinionSDKTrader:
 
     def execute_custom_strategy_v2(self, groups, market_id, token_id, selected_token_name, selected_indices, buy_config, sell_config, account_positions):
         """执行自定义策略V2"""
-        import threading
         import random
+        import threading
 
         section("执行自定义策略")
 
@@ -9158,6 +9195,8 @@ class OpinionSDKTrader:
                 tx_hash = result.get('tx_hash', '')
                 if tx_hash:
                     success(f"拆分成功! tx: {tx_hash[:20]}...")
+                    # 打印 BSC 链接供检查
+                    print(f"  🔗 BSC: https://bscscan.com/tx/{tx_hash}")
                 else:
                     success(f"拆分成功!")
                 if result.get('warning'):
@@ -9171,6 +9210,10 @@ class OpinionSDKTrader:
         print(f"拆分完成: 成功 {success_count}, 失败 {fail_count}")
         divider()
 
+        # 拆分完成后直接返回，不再询问卖出
+        return
+
+        # 以下代码已禁用 - 不再询问卖出方向
         # 7. 拆分完成后询问是否卖出
         if success_count > 0:
             shares = int(split_amount)
@@ -11831,6 +11874,7 @@ def parse_config_line(line: str) -> List[str]:
         解析后的字段列表
     """
     import re
+
     # 先用 | 分割
     parts = line.split('|')
     result = []
