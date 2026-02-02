@@ -3006,8 +3006,11 @@ class OpinionSDKTrader:
                                 market_id=market_id)
 
                             if tx_hash:
+                                # 确保 tx_hash 有 0x 前缀
+                                if not tx_hash.startswith('0x'):
+                                    tx_hash = '0x' + tx_hash
                                 console.print(
-                                    f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
+                                    f"[green]✓ 成功[/green] (tx: {tx_hash[:18]}...)")
                                 total_claimed += 1
                             else:
                                 console.print(f"[green]✓ 成功[/green]")
@@ -3121,8 +3124,11 @@ class OpinionSDKTrader:
                         market_id=market_id)
 
                     if tx_hash:
+                        # 确保 tx_hash 有 0x 前缀
+                        if not tx_hash.startswith('0x'):
+                            tx_hash = '0x' + tx_hash
                         console.print(
-                            f"[green]✓ 成功[/green] (tx: {tx_hash[:16]}...)")
+                            f"[green]✓ 成功[/green] (tx: {tx_hash[:18]}...)")
                     else:
                         console.print(f"[green]✓ 成功[/green]")
                     success_count += 1
@@ -9194,7 +9200,10 @@ class OpinionSDKTrader:
             if result['success']:
                 tx_hash = result.get('tx_hash', '')
                 if tx_hash:
-                    success(f"拆分成功! tx: {tx_hash[:20]}...")
+                    # 确保 tx_hash 有 0x 前缀
+                    if not tx_hash.startswith('0x'):
+                        tx_hash = '0x' + tx_hash
+                    success(f"拆分成功! tx: {tx_hash[:22]}...")
                     # 打印 BSC 链接供检查
                     print(f"  🔗 BSC: https://bscscan.com/tx/{tx_hash}")
                 else:
@@ -9404,7 +9413,11 @@ class OpinionSDKTrader:
         if result['success']:
             success(f"合并成功! 获得 ${merge_shares:.2f} USDT")
             if result.get('tx_hash'):
-                print(f"  交易哈希: {result['tx_hash'][:20]}...")
+                tx_hash = result['tx_hash']
+                # 确保 tx_hash 有 0x 前缀
+                if not tx_hash.startswith('0x'):
+                    tx_hash = '0x' + tx_hash
+                print(f"  🔗 BSC: https://bscscan.com/tx/{tx_hash}")
         else:
             error(f"合并失败: {result.get('error', '未知错误')}")
 
@@ -12097,8 +12110,7 @@ def main():
             config_path = sys.argv[1]
 
         if not config_path:
-            config_path = ask("请输入配置文件或目录路径 (默认: trader_configs.txt): ")
-        if not config_path:
+            # 默认直接使用 trader_configs.txt，不再询问
             config_path = "trader_configs.txt"
 
         # 判断是文件还是目录

@@ -225,13 +225,15 @@ class MergeSplitService:
         """
         import time
 
-        shares_int = int(shares)
+        # BSC上条件代币精度也是18位，需要乘以 10^18
+        # 用户输入 3 份 → 传给 SDK int(3 * 10^18)
+        shares_int = int(shares * 10**18)
         last_error = None
 
         for attempt in range(max_retries):
             try:
-                # 调用 SDK 的 merge 接口
-                result = client.merge(market_id=market_id, shares=shares_int)
+                # 调用 SDK 的 merge 接口（SDK参数名是amount，不是shares）
+                result = client.merge(market_id=market_id, amount=shares_int)
 
                 # 处理 Tuple 返回值（新版 SDK）
                 if isinstance(result, tuple):
@@ -294,10 +296,10 @@ class MergeSplitService:
         """
         import time
 
-        # 转换为 USDT 最小单位 (6 decimals)
-        # 用户输入 $2 → 需要传给 SDK 2_000_000
-        amount_int = int(amount * 1_000_000)
-        shares_result = int(amount)  # 实际拆分得到的份额数量
+        # BSC上USDT精度是18位，需要乘以 10^18
+        # 用户输入 $3 → 传给 SDK int(3 * 10^18)
+        amount_int = int(amount * 10**18)
+        shares_result = int(amount)  # 实际拆分得到的份额数量（用户视角的USDT数量）
         last_error = None
 
         for attempt in range(max_retries):
