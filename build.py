@@ -191,6 +191,9 @@ def build_executable(onedir=False):
     # Collect opinion_trader package data
     cmd.extend(["--collect-all", "opinion_trader"])
     cmd.extend(["--collect-all", "opinion_clob_sdk"])
+    cmd.extend(["--collect-all", "rich"])
+    cmd.extend(["--collect-all", "questionary"])
+    cmd.extend(["--collect-all", "prompt_toolkit"])
 
     # Main script
     cmd.append(entry_script)
