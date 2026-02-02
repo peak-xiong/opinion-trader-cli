@@ -134,13 +134,18 @@ def select(prompt: str, choices: list, back_option: bool = True, back_text: str 
         q_choices.append(Separator("─" * 35))
         q_choices.append(Choice(f"↩️  {back_text}", value=None))
 
-    return questionary.select(
+    result = questionary.select(
         prompt,
         choices=q_choices,
         style=Q_STYLE,
         use_shortcuts=False,
         use_arrow_keys=True,
     ).ask()
+    
+    # 处理用户取消或中断的情况
+    if result is None or result == "":
+        return None
+    return result
 
 
 def select_multiple(prompt: str, choices: list, min_count: int = 0) -> list:

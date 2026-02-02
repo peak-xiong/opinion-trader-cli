@@ -3571,7 +3571,7 @@ class OpinionSDKTrader:
                 ("🎁 Claim (领取收益)", "claim"),
             ], back_text="退出程序")
 
-            if choice is None:
+            if choice is None or choice == "":
                 success("程序退出")
                 return
             elif choice == 'trade':
