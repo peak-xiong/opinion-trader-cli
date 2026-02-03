@@ -47,7 +47,8 @@ jobs:
         with:
           name: opinion-trader-${{ matrix.platform }}-${{ matrix.arch }}
           path: dist/opinion-trader-*
-          retention-days: 90
+          retention-days: 1
+          overwrite: true
 
   package:
     needs: build
@@ -70,4 +71,39 @@ jobs:
         with:
           name: opinion-trader-all-platforms
           path: release/
-          retention-days: 90
+          retention-days: 1
+          overwrite: true
+
+      - name: Delete intermediate artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            opinion-trader-macos-arm64
+            opinion-trader-windows-x64
+
+  release:
+    needs: package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download combined artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: opinion-trader-all-platforms
+          path: release/
+
+      - name: Create or Update Latest Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          files: release/*
+          prerelease: true
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete all artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: opinion-trader-all-platforms
